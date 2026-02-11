@@ -1,0 +1,92 @@
+/* =========================
+   Layout centrado tipo "Permisos"
+   ========================= */
+.page-wrap{
+  max-width: 920px;
+  margin: 0 auto;
+  background-color: #f9f9f9; /* Fondo más claro */
+  padding: 20px;
+  border-radius: 16px;
+}
+
+.inner-box{
+  border: 1px solid #e6ecf5;
+  border-radius: 14px;
+  padding: 20px;
+  background: #fff;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Sombra suave */
+}
+
+/* Grid simétrico (igual para Permisos/Reposos/Personal) */
+.form-grid-4{
+  display:grid;
+  grid-template-columns: 1.4fr 1fr 0.8fr 0.8fr;
+  gap: 15px;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.form-actions{
+  display:flex;
+  justify-content:flex-end;
+  gap:15px;
+  margin-top: 10px;
+}
+
+@media (max-width: 980px){
+  .page-wrap{ max-width: 760px; }
+  .form-grid-4{ grid-template-columns: 1fr 1fr; }
+  .form-grid-4 .span2{ grid-column: span 2; }
+}
+
+@media (max-width: 620px){
+  .form-grid-4{ grid-template-columns: 1fr; }
+  .form-actions{ justify-content: center; }
+  .form-actions .btn,
+  .form-actions a{ width: 100%; justify-content:center; }
+}
+
+/* =========================
+   Acciones de PERSONAL (3 estados)
+   ========================= */
+.actions-personal{
+  display:flex;
+  gap:10px;
+  align-items:center;
+  flex-wrap:wrap;
+}
+
+.btn-action{
+  padding: 10px 20px;
+  border-radius: 12px;
+  border: none;
+  font-weight: bold;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.btn-action:hover{
+  transform: translateY(-2px); /* Efecto de elevación */
+}
+
+/* Botón verde */
+.btn-activar{ background:#22c55e; color:#fff; }
+.btn-activar:hover{ background:#16a34a; }
+
+/* Botón rojo */
+.btn-suspender{ background:#ef4444; color:#fff; }
+.btn-suspender:hover{ background:#dc2626; }
+
+/* Botón negro elegante */
+.btn-retirar{ background:#111827; color:#fff; }
+.btn-retirar:hover{ background:#1f2937; }
+
+/* Mejora visual con transiciones en los botones */
+.btn-action:focus{
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.4); /* Sombra para mejorar enfoque */
+}
+
