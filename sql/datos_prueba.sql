@@ -22,13 +22,3 @@ SELECT '12345679','María','García','04121234567',
        'ACTIVO'
 WHERE NOT EXISTS (SELECT 1 FROM empleados WHERE cedula='12345679');
 
--- Usuarios (bcrypt)
-INSERT INTO usuarios (usuario, clave_hash, rol, estado) VALUES
-('diurno',     '$2y$10$8fNT/1mpXzPvcZ1PIcNoUuJWE.e6o740t.qLYGtZpaJqsUwRWHD6a', 'DIURNO',    'ACTIVO'),
-('tarde',      '$2y$10$zMqiXwhjMkpmDzJk6w0BruH7MNfToO8c5IXMrYJdig0kieMNaf/mS', 'TARDE',     'ACTIVO'),
-('directora',  '$2y$10$QHZ4tTwwvMKNGs7.SlE66uHplp3m8KMj9hLilm76/v66zrEduaL8K', 'DIRECTORA', 'ACTIVO'),
-('dev',        '$2y$10$dsuu1oc8aU8weXwz6jJk3edmkjWpRQBKcxHqK8pDuxHGadTkDkMby', 'SUPER',     'ACTIVO')
-ON DUPLICATE KEY UPDATE
-clave_hash=VALUES(clave_hash),
-rol=VALUES(rol),
-estado=VALUES(estado);

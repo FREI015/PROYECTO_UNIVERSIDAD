@@ -214,6 +214,7 @@ $logoutUrl = BASE_URL . "/procesos/logout.php";
   <div class="nav">
     <a class="<?php echo $active==='asistencias'?'active':''; ?>" href="<?php echo e(BASE_URL); ?>/modulos/asistencias.php">Asistencias</a>
     <a class="<?php echo $active==='permisos'?'active':''; ?>" href="<?php echo e(BASE_URL); ?>/modulos/permisos.php">Permisos</a>
+   <a class="<?php echo $active==='reportes'?'active':''; ?>" href="<?php echo e(BASE_URL); ?>/modulos/reportes.php">Reportes</a>
     <a class="<?php echo $active==='reposos'?'active':''; ?>" href="<?php echo e(BASE_URL); ?>/modulos/reposos.php">Reposos</a>
     <a class="<?php echo $active==='personal'?'active':''; ?>" href="<?php echo e(BASE_URL); ?>/modulos/personal.php">Personal</a>
   </div>

@@ -1,27 +1,24 @@
--- =========================================================
--- BD Control de Asistencia (ESTABLE v3)
--- =========================================================
-DROP DATABASE IF EXISTS control_asistencia;
-CREATE DATABASE control_asistencia CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+CREATE DATABASE IF NOT EXISTS control_asistencia
+  CHARACTER SET utf8mb4
+  COLLATE utf8mb4_unicode_ci;
+
 USE control_asistencia;
 
--- ===== CARGOS =====
-CREATE TABLE cargos (
+CREATE TABLE IF NOT EXISTS cargos (
   id INT AUTO_INCREMENT PRIMARY KEY,
   nombre VARCHAR(80) NOT NULL UNIQUE,
   descripcion VARCHAR(200) NULL
 ) ENGINE=InnoDB;
 
--- ===== TURNOS =====
-CREATE TABLE turnos (
+CREATE TABLE IF NOT EXISTS turnos (
   id INT AUTO_INCREMENT PRIMARY KEY,
   nombre VARCHAR(50) NOT NULL UNIQUE,
   hora_inicio TIME NOT NULL,
   hora_fin TIME NOT NULL
 ) ENGINE=InnoDB;
 
--- ===== EMPLEADOS =====
-CREATE TABLE empleados (
+CREATE TABLE IF NOT EXISTS empleados (
   id INT AUTO_INCREMENT PRIMARY KEY,
   cedula VARCHAR(15) NOT NULL UNIQUE,
   nombres VARCHAR(80) NOT NULL,
@@ -36,24 +33,16 @@ CREATE TABLE empleados (
   CONSTRAINT fk_empleado_turno FOREIGN KEY (turno_id) REFERENCES turnos(id)
 ) ENGINE=InnoDB;
 
-CREATE INDEX idx_empleados_nombre ON empleados(apellidos, nombres);
-CREATE INDEX idx_empleados_cedula ON empleados(cedula);
-
--- ===== USUARIOS =====
-CREATE TABLE usuarios (
+CREATE TABLE IF NOT EXISTS usuarios (
   id INT AUTO_INCREMENT PRIMARY KEY,
   usuario VARCHAR(50) NOT NULL UNIQUE,
-  clave_hash VARCHAR(255) NOT NULL,
+  clave VARCHAR(255) NOT NULL,
   rol ENUM('DIURNO','TARDE','DIRECTORA','SUPER') NOT NULL DEFAULT 'DIURNO',
   estado ENUM('ACTIVO','INACTIVO') NOT NULL DEFAULT 'ACTIVO',
   creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
-CREATE INDEX idx_usuarios_rol ON usuarios(rol);
-CREATE INDEX idx_usuarios_estado ON usuarios(estado);
-
--- ===== ASISTENCIAS =====
-CREATE TABLE asistencias (
+CREATE TABLE IF NOT EXISTS asistencias (
   id INT AUTO_INCREMENT PRIMARY KEY,
   empleado_id INT NOT NULL,
   fecha DATE NOT NULL,
@@ -69,11 +58,7 @@ CREATE TABLE asistencias (
   CONSTRAINT fk_asistencia_usuario FOREIGN KEY (registrado_por) REFERENCES usuarios(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
-CREATE INDEX idx_asistencias_fecha ON asistencias(fecha);
-CREATE INDEX idx_asistencias_estado ON asistencias(estado);
-
--- ===== PERMISOS =====
-CREATE TABLE permisos (
+CREATE TABLE IF NOT EXISTS permisos (
   id INT AUTO_INCREMENT PRIMARY KEY,
   empleado_id INT NOT NULL,
   fecha_inicio DATE NOT NULL,
@@ -88,11 +73,7 @@ CREATE TABLE permisos (
   CONSTRAINT fk_permiso_usuario FOREIGN KEY (creado_por) REFERENCES usuarios(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
-CREATE INDEX idx_permisos_rango ON permisos(fecha_inicio, fecha_fin);
-CREATE INDEX idx_permisos_estado ON permisos(estado);
-
--- ===== REPOSOS =====
-CREATE TABLE reposos (
+CREATE TABLE IF NOT EXISTS reposos (
   id INT AUTO_INCREMENT PRIMARY KEY,
   empleado_id INT NOT NULL,
   fecha_inicio DATE NOT NULL,
@@ -107,6 +88,3 @@ CREATE TABLE reposos (
   CONSTRAINT fk_reposo_empleado FOREIGN KEY (empleado_id) REFERENCES empleados(id) ON DELETE CASCADE,
   CONSTRAINT fk_reposo_usuario FOREIGN KEY (creado_por) REFERENCES usuarios(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
-
-CREATE INDEX idx_reposos_rango ON reposos(fecha_inicio, fecha_fin);
-CREATE INDEX idx_reposos_estado ON reposos(estado);
