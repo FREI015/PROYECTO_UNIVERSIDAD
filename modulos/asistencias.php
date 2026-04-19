@@ -20,6 +20,9 @@ $estadoFiltro = trim($_GET["estado"] ?? "");
 $turnoFiltro  = trim($_GET["turno"] ?? "");
 $desde = trim($_GET["desde"] ?? "");
 $hasta = trim($_GET["hasta"] ?? "");
+$pagina = max(1, (int)($_GET["pagina"] ?? 1));
+$porPagina = 10;
+$offset = ($pagina - 1) * $porPagina;
 
 $turnos = $pdo->query("SELECT id, nombre FROM turnos ORDER BY id")->fetchAll(PDO::FETCH_ASSOC);
 
@@ -118,7 +121,7 @@ if ($turnoFiltro !== "") {
   $params[] = (int)$turnoFiltro;
 }
 
-$sql = "
+$sqlBase = "
 SELECT
   e.id,
   CONCAT(e.nombres,' ',e.apellidos) AS nombre,
@@ -171,12 +174,25 @@ LEFT JOIN (
 $paramsBase = [$hoy, $hoy, $hoy];
 $paramsFinal = array_merge($paramsBase, $params);
 
+$sqlCount = "SELECT COUNT(*) AS total FROM ($sqlBase";
+if (!empty($where)) $sqlCount .= " WHERE " . implode(" AND ", $where);
+$sqlCount .= ") AS tmp";
+$stmtCount = $pdo->prepare($sqlCount);
+$stmtCount->execute($paramsFinal);
+$totalEmpleados = (int)($stmtCount->fetch(PDO::FETCH_ASSOC)["total"] ?? 0);
+
+$sql = $sqlBase;
 if (!empty($where)) $sql .= " WHERE " . implode(" AND ", $where);
-$sql .= " ORDER BY e.apellidos, e.nombres";
+$sql .= " ORDER BY e.apellidos, e.nombres LIMIT $porPagina OFFSET $offset";
 
 $stmt = $pdo->prepare($sql);
 $stmt->execute($paramsFinal);
 $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+$totalPaginas = ceil($totalEmpleados / $porPagina);
+$paginaActual = min($pagina, $totalPaginas);
+$mostrandoInicio = $offset + 1;
+$mostrandoFin = min($offset + $porPagina, $totalEmpleados);
 
 $empleados = [];
 foreach ($rows as $row) {
@@ -273,6 +289,15 @@ foreach ($rows as $row) {
   .in{background:#22c55e;color:#fff}
   .out{background:#ef4444;color:#fff}
   .muted{opacity:.75;font-size:12px;margin-top:6px}
+
+  .pagination{display:flex;justify-content:space-between;align-items:center;margin-top:14px;padding-top:14px;border-top:1px solid #e5e7eb}
+  .pagination-info{color:#6b7280;font-size:13px;font-weight:900}
+  .pagination-pages{display:flex;gap:6px}
+  .pagination-pages a,.pagination-pages span{padding:8px 14px;border-radius:10px;text-decoration:none;font-weight:900;font-size:13px;display:inline-flex;align-items:center}
+  .pagination-pages a{background:#f1f5f9;color:#111}
+  .pagination-pages a:hover{background:#e2e8f0}
+  .pagination-pages .current{background:#0b6fe6;color:#fff}
+  .pagination-pages .disabled{opacity:.4;pointer-events:none}
 
   @media (max-width: 1300px){ .grid6{grid-template-columns:repeat(3,1fr)} }
   @media (max-width: 980px){ .grid6{grid-template-columns:repeat(2,1fr)} }
@@ -401,6 +426,34 @@ foreach ($rows as $row) {
       <?php endforeach; ?>
     </tbody>
   </table>
+
+  <?php if ($totalPaginas > 0): ?>
+  <div class="pagination">
+    <div class="pagination-info">
+      Mostrando <?php echo $mostrandoInicio; ?>-<?php echo $mostrandoFin; ?> de <?php echo $totalEmpleados; ?> empleados
+    </div>
+    <div class="pagination-pages">
+      <?php
+        function buildUrl($params, $pag) {
+          $params["pagina"] = $pag;
+          return BASE_URL . "/modulos/asistencias.php?" . http_build_query($params);
+        }
+        $filters = array_filter([
+          "q" => $q,
+          "estado" => $estadoFiltro,
+          "turno" => $turnoFiltro,
+          "desde" => $desde,
+          "hasta" => $hasta
+        ], fn($v) => $v !== "");
+      ?>
+      <a href="<?php echo buildUrl($filters, $pagina - 1); ?>" class="<?php echo $pagina <= 1 ? 'disabled' : ''; ?>">‹ Anterior</a>
+      <?php for ($i = 1; $i <= $totalPaginas; $i++): ?>
+        <a href="<?php echo buildUrl($filters, $i); ?>" class="<?php echo $i === $pagina ? 'current' : ''; ?>"><?php echo $i; ?></a>
+      <?php endfor; ?>
+      <a href="<?php echo buildUrl($filters, $pagina + 1); ?>" class="<?php echo $pagina >= $totalPaginas ? 'disabled' : ''; ?>">Siguiente ›</a>
+    </div>
+  </div>
+  <?php endif; ?>
 </div>
 
 <?php require_once __DIR__ . "/../includes/footer.php"; ?>

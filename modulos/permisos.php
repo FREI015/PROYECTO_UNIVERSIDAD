@@ -7,6 +7,9 @@ requireLogin();
 
 $msg = trim($_GET["msg"] ?? "");
 $err = trim($_GET["err"] ?? "");
+$pagina = max(1, (int)($_GET["pagina"] ?? 1));
+$porPagina = 10;
+$offset = ($pagina - 1) * $porPagina;
 
 // Empleados para el select
 $empleados = $pdo->query("
@@ -16,7 +19,11 @@ $empleados = $pdo->query("
   ORDER BY e.apellidos, e.nombres
 ")->fetchAll(PDO::FETCH_ASSOC);
 
-// Lista permisos
+// Lista permisos con paginación
+$stmtTotal = $pdo->query("SELECT COUNT(*) AS total FROM permisos");
+$totalPermisos = (int)($stmtTotal->fetch(PDO::FETCH_ASSOC)["total"] ?? 0);
+$totalPaginas = ceil($totalPermisos / $porPagina);
+
 $permisos = $pdo->query("
   SELECT
     p.id, p.tipo, p.fecha_inicio, p.fecha_fin, p.motivo, p.observaciones, p.estado, p.creado_en,
@@ -29,8 +36,11 @@ $permisos = $pdo->query("
   JOIN cargos c ON c.id = e.cargo_id
   LEFT JOIN usuarios u ON u.id = p.creado_por
   ORDER BY p.id DESC
-  LIMIT 50
+  LIMIT $porPagina OFFSET $offset
 ")->fetchAll(PDO::FETCH_ASSOC);
+
+$mostrandoInicio = $offset + 1;
+$mostrandoFin = min($offset + $porPagina, $totalPermisos);
 
 $pageTitle = "Permisos";
 $active = "permisos";
@@ -142,6 +152,15 @@ require_once __DIR__ . "/../includes/header.php";
     align-items:center;
     justify-content:center;
   }
+
+  .pagination{display:flex;justify-content:space-between;align-items:center;margin-top:14px;padding-top:14px;border-top:1px solid #e5e7eb}
+  .pagination-info{color:#6b7280;font-size:13px;font-weight:900}
+  .pagination-pages{display:flex;gap:6px}
+  .pagination-pages a,.pagination-pages span{padding:8px 14px;border-radius:10px;text-decoration:none;font-weight:900;font-size:13px;display:inline-flex;align-items:center}
+  .pagination-pages a{background:#f1f5f9;color:#111}
+  .pagination-pages a:hover{background:#e2e8f0}
+  .pagination-pages .current{background:#0b6fe6;color:#fff}
+  .pagination-pages .disabled{opacity:.4;pointer-events:none}
 
   /* Card tabla */
   .table-card{
@@ -283,6 +302,26 @@ require_once __DIR__ . "/../includes/header.php";
         <?php endif; ?>
       </tbody>
     </table>
+
+    <?php if ($totalPaginas > 0): ?>
+    <div class="pagination">
+      <div class="pagination-info">
+        Mostrando <?php echo $mostrandoInicio; ?>-<?php echo $mostrandoFin; ?> de <?php echo $totalPermisos; ?> permisos
+      </div>
+      <div class="pagination-pages">
+        <?php
+          function buildUrl($pag) {
+            return BASE_URL . "/modulos/permisos.php?pagina=" . $pag;
+          }
+        ?>
+        <a href="<?php echo buildUrl($pagina - 1); ?>" class="<?php echo $pagina <= 1 ? 'disabled' : ''; ?>">‹ Anterior</a>
+        <?php for ($i = 1; $i <= $totalPaginas; $i++): ?>
+          <a href="<?php echo buildUrl($i); ?>" class="<?php echo $i === $pagina ? 'current' : ''; ?>"><?php echo $i; ?></a>
+        <?php endfor; ?>
+        <a href="<?php echo buildUrl($pagina + 1); ?>" class="<?php echo $pagina >= $totalPaginas ? 'disabled' : ''; ?>">Siguiente ›</a>
+      </div>
+    </div>
+    <?php endif; ?>
   </div>
 
 </div>
@@ -304,6 +343,22 @@ require_once __DIR__ . "/../includes/header.php";
     desde.addEventListener('change', sync);
     hasta.addEventListener('change', sync);
     sync();
+  })();
+
+  // ✅ Validaciones: Solo letras para Tipo y Motivo
+  (function(){
+    const tipoInput = document.querySelector('input[name="tipo"]');
+    const motivoInput = document.querySelector('input[name="motivo"]');
+    const regexNoLetras = /[^a-zA-ZáéíóúÁÉÍÓÚÜüÑñ\s]/g;
+
+    function validarSoloLetras(input) {
+      input.addEventListener('input', function() {
+        this.value = this.value.replace(regexNoLetras, '');
+      });
+    }
+
+    if (tipoInput) validarSoloLetras(tipoInput);
+    if (motivoInput) validarSoloLetras(motivoInput);
   })();
 </script>
 

@@ -6,6 +6,9 @@ require_once __DIR__ . "/../includes/conexion.php";
 
 $msg = trim($_GET["msg"] ?? "");
 $err = trim($_GET["err"] ?? "");
+$pagina = max(1, (int)($_GET["pagina"] ?? 1));
+$porPagina = 10;
+$offset = ($pagina - 1) * $porPagina;
 
 // Cargos
 $cargos = $pdo->query("SELECT id, nombre FROM cargos ORDER BY nombre")->fetchAll(PDO::FETCH_ASSOC);
@@ -13,7 +16,11 @@ $cargos = $pdo->query("SELECT id, nombre FROM cargos ORDER BY nombre")->fetchAll
 // ✅ Turnos (incluye Turnos Nocturnos)
 $turnos = $pdo->query("SELECT id, nombre FROM turnos ORDER BY id")->fetchAll(PDO::FETCH_ASSOC);
 
-// Personal (incluye turno)
+// Personal (incluye turno) con paginacion
+$stmtTotal = $pdo->query("SELECT COUNT(*) AS total FROM empleados");
+$totalPersonal = (int)($stmtTotal->fetch(PDO::FETCH_ASSOC)["total"] ?? 0);
+$totalPaginas = ceil($totalPersonal / $porPagina);
+
 $personal = $pdo->query("
   SELECT e.id, e.cedula,
          CONCAT(
@@ -27,7 +34,11 @@ $personal = $pdo->query("
   JOIN cargos c ON c.id = e.cargo_id
   LEFT JOIN turnos t ON t.id = e.turno_id
   ORDER BY e.apellidos, e.nombres
+  LIMIT $porPagina OFFSET $offset
 ")->fetchAll(PDO::FETCH_ASSOC);
+
+$mostrandoInicio = $offset + 1;
+$mostrandoFin = min($offset + $porPagina, $totalPersonal);
 
 $pageTitle = "Personal del Plantel";
 $active = "personal";
@@ -102,6 +113,15 @@ require_once __DIR__ . "/../includes/header.php";
   .btn-suspender{ background:#fef3c7; border-color:#fde68a; color:#92400e; }
   .btn-retirar{ background:#fee2e2; border-color:#fecaca; color:#991b1b; }
 
+  .pagination{display:flex;justify-content:space-between;align-items:center;margin-top:14px;padding-top:14px;border-top:1px solid #e5e7eb}
+  .pagination-info{color:#6b7280;font-size:13px;font-weight:900}
+  .pagination-pages{display:flex;gap:6px}
+  .pagination-pages a,.pagination-pages span{padding:8px 14px;border-radius:10px;text-decoration:none;font-weight:900;font-size:13px;display:inline-flex;align-items:center}
+  .pagination-pages a{background:#f1f5f9;color:#111}
+  .pagination-pages a:hover{background:#e2e8f0}
+  .pagination-pages .current{background:#0b6fe6;color:#fff}
+  .pagination-pages .disabled{opacity:.4;pointer-events:none}
+
   @media (max-width: 980px){
     .pers-form{ max-width: 100%; }
     .grid4{ grid-template-columns: 1fr 1fr; }
@@ -127,22 +147,22 @@ require_once __DIR__ . "/../includes/header.php";
     <?php if ($err): ?><div class="alert bad"><?php echo e($err); ?></div><?php endif; ?>
 
     <div class="pers-form">
-      <form method="POST" action="../procesos/personal_guardar.php">
+      <form method="POST" action="../procesos/personal_guardar.php" id="formPersonal">
         <div class="grid4">
 
           <div class="field">
             <label>Nombres</label>
-            <input class="input" name="nombres" required placeholder="Ej: María">
+            <input class="input" name="nombres" id="inputNombres" required placeholder="Ej: María">
           </div>
 
           <div class="field">
             <label>Apellidos</label>
-            <input class="input" name="apellidos" required placeholder="Ej: García">
+            <input class="input" name="apellidos" id="inputApellidos" required placeholder="Ej: García">
           </div>
 
           <div class="field">
             <label>Cédula</label>
-            <input class="input" name="cedula" required placeholder="Ej: 12345678" inputmode="numeric">
+            <input class="input" name="cedula" id="inputCedula" required placeholder="Ej: 12345678" inputmode="numeric">
           </div>
 
           <div class="field">
@@ -180,7 +200,7 @@ require_once __DIR__ . "/../includes/header.php";
 
   <div class="card table-card">
     <div class="table-title">Listado de Personal</div>
-    <p class="table-sub">Este listado es el que aparece en Asistencias (según filtros y estado).</p>
+    <p class="table-sub">Listado de personal registrado.</p>
 
     <table>
       <thead>
@@ -230,8 +250,60 @@ require_once __DIR__ . "/../includes/header.php";
         <?php endforeach; ?>
       </tbody>
     </table>
+
+    <?php if ($totalPaginas > 0): ?>
+    <div class="pagination">
+      <div class="pagination-info">
+        Mostrando <?php echo $mostrandoInicio; ?>-<?php echo $mostrandoFin; ?> de <?php echo $totalPersonal; ?> personal
+      </div>
+      <div class="pagination-pages">
+        <?php
+          function buildUrl($pag) {
+            return BASE_URL . "/modulos/personal.php?pagina=" . $pag;
+          }
+        ?>
+        <a href="<?php echo buildUrl($pagina - 1); ?>" class="<?php echo $pagina <= 1 ? 'disabled' : ''; ?>">‹ Anterior</a>
+        <?php for ($i = 1; $i <= $totalPaginas; $i++): ?>
+          <a href="<?php echo buildUrl($i); ?>" class="<?php echo $i === $pagina ? 'current' : ''; ?>"><?php echo $i; ?></a>
+        <?php endfor; ?>
+        <a href="<?php echo buildUrl($pagina + 1); ?>" class="<?php echo $pagina >= $totalPaginas ? 'disabled' : ''; ?>">Siguiente ›</a>
+      </div>
+    </div>
+    <?php endif; ?>
   </div>
 
 </div>
+
+<script>
+  // ✅ Validaciones para Personal
+  (function(){
+    const nombresInput = document.getElementById('inputNombres');
+    const apellidosInput = document.getElementById('inputApellidos');
+    const cedulaInput = document.getElementById('inputCedula');
+    const regexNoLetras = /[^a-zA-ZáéíóúÁÉÍÓÚÜüÑñ\s]/g;
+    const regexNoNumeros = /[^0-9]/g;
+
+    // Nombres: solo letras
+    if (nombresInput) {
+      nombresInput.addEventListener('input', function() {
+        this.value = this.value.replace(regexNoLetras, '');
+      });
+    }
+
+    // Apellidos: solo letras
+    if (apellidosInput) {
+      apellidosInput.addEventListener('input', function() {
+        this.value = this.value.replace(regexNoLetras, '');
+      });
+    }
+
+    // Cédula: solo números
+    if (cedulaInput) {
+      cedulaInput.addEventListener('input', function() {
+        this.value = this.value.replace(regexNoNumeros, '');
+      });
+    }
+  })();
+</script>
 
 <?php require_once __DIR__ . "/../includes/footer.php"; ?>
