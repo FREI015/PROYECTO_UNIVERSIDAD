@@ -57,3 +57,10 @@ function requireLogin() {
   header("Location: " . $login);
   exit;
 }
+
+function formatCedula($cedula) {
+  $cedula = (string)$cedula;
+  if (!is_numeric($cedula) || $cedula === "") return $cedula;
+  $num = (int)$cedula;
+  return number_format($num, 0, ",", ".");
+}

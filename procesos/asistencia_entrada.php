@@ -49,19 +49,24 @@ if ($estadoEmp !== "ACTIVO") {
   exit;
 }
 
-// 2) Bloquear si tiene reposo/permiso activo HOY (fecha real)
-$stmt = $pdo->prepare("SELECT id FROM reposos WHERE empleado_id=? AND estado='ACTIVO' AND ? BETWEEN fecha_inicio AND fecha_fin LIMIT 1");
-$stmt->execute([$empleado_id, $hoy_real]);
-if ($stmt->fetch()) {
-  header("Location: " . BASE_URL . "/modulos/asistencias.php?err=" . urlencode("No puedes marcar: reposo activo"));
-  exit;
-}
+// ✅ MODO EMERGENCIA: saltar restricciones si está activo
+$modoEmergencia = !empty($_SESSION['modo_emergencia']);
 
-$stmt = $pdo->prepare("SELECT id FROM permisos WHERE empleado_id=? AND estado='ACTIVO' AND ? BETWEEN fecha_inicio AND fecha_fin LIMIT 1");
-$stmt->execute([$empleado_id, $hoy_real]);
-if ($stmt->fetch()) {
-  header("Location: " . BASE_URL . "/modulos/asistencias.php?err=" . urlencode("No puedes marcar: permiso activo"));
-  exit;
+// 2) Bloquear si tiene reposo/permiso activo HOY (fecha real) — sauf modo emergencia
+if (!$modoEmergencia) {
+  $stmt = $pdo->prepare("SELECT id FROM reposos WHERE empleado_id=? AND estado='ACTIVO' AND ? BETWEEN fecha_inicio AND fecha_fin LIMIT 1");
+  $stmt->execute([$empleado_id, $hoy_real]);
+  if ($stmt->fetch()) {
+    header("Location: " . BASE_URL . "/modulos/asistencias.php?err=" . urlencode("No puedes marcar: reposo activo"));
+    exit;
+  }
+
+  $stmt = $pdo->prepare("SELECT id FROM permisos WHERE empleado_id=? AND estado='ACTIVO' AND ? BETWEEN fecha_inicio AND fecha_fin LIMIT 1");
+  $stmt->execute([$empleado_id, $hoy_real]);
+  if ($stmt->fetch()) {
+    header("Location: " . BASE_URL . "/modulos/asistencias.php?err=" . urlencode("No puedes marcar: permiso activo"));
+    exit;
+  }
 }
 
 // 3) Calcular retardo según turno + tolerancia (SEGURA)

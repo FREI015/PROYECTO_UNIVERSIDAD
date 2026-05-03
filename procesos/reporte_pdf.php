@@ -113,15 +113,27 @@ function dateListInclusive(string $desde, string $hasta): array {
 $periodo    = strtoupper(trim($_GET["periodo"] ?? "DIARIO"));
 $fechaBase  = clampDate($_GET["fecha_base"] ?? "", date("Y-m-d"));
 $turnoIdRaw = trim($_GET["turno_id"] ?? "");
+$empleadoId = (int)($_GET["empleado_id"] ?? 0);
 
 $desdeIn = trim($_GET["desde"] ?? "");
 $hastaIn = trim($_GET["hasta"] ?? "");
+
+// ✅ Modo INDIVIDUAL: reporte de un solo empleado
+$esIndividual = ($periodo === "INDIVIDUAL" && $empleadoId > 0);
 
 // Si el usuario pone desde/hasta, usamos ese rango; si no, calculamos por periodo/fecha_base.
 if ($desdeIn !== "" && $hastaIn !== "" && preg_match('/^\d{4}-\d{2}-\d{2}$/', $desdeIn) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $hastaIn)) {
   $desde = $desdeIn;
   $hasta = $hastaIn;
   $label = "Rango ($desde al $hasta)";
+} elseif ($esIndividual) {
+  // Para individual, usar el rango proporcionado o mes actual
+  if ($desdeIn !== "" && $hastaIn !== "") {
+    $label = "Individual ($desde al $hasta)";
+  } else {
+    [$desde, $hasta, $label] = rangeFromPeriodo("MENSUAL", date("Y-m-d"));
+    $label = str_replace("Mensual", "Individual", $label);
+  }
 } else {
   [$desde, $hasta, $label] = rangeFromPeriodo($periodo, $fechaBase);
 }
@@ -130,29 +142,47 @@ $turnoId = ($turnoIdRaw === "") ? null : (int)$turnoIdRaw;
 $dates = dateListInclusive($desde, $hasta);
 
 /* =========================
-   1) Empleados (ACTIVOS)
+   1) Empleados
    ========================= */
-$sqlEmp = "
-  SELECT e.id, e.cedula, e.nombres, e.apellidos, e.estado,
-         c.nombre AS cargo,
-         t.nombre AS turno
-  FROM empleados e
-  JOIN cargos c ON c.id = e.cargo_id
-  LEFT JOIN turnos t ON t.id = e.turno_id
-  WHERE e.estado='ACTIVO'
-";
-$paramsEmp = [];
 
-if ($turnoId !== null) {
-  $sqlEmp .= " AND e.turno_id = ? ";
-  $paramsEmp[] = $turnoId;
+// ✅ Si es individual, buscar solo ese empleado
+if ($esIndividual) {
+  $sqlEmp = "
+    SELECT e.id, e.cedula, e.nombres, e.apellidos, e.estado,
+           c.nombre AS cargo,
+           t.nombre AS turno
+    FROM empleados e
+    JOIN cargos c ON c.id = e.cargo_id
+    LEFT JOIN turnos t ON t.id = e.turno_id
+    WHERE e.id = ?
+  ";
+  $stmt = $pdo->prepare($sqlEmp);
+  $stmt->execute([$empleadoId]);
+  $empleados = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} else {
+  // Reporte general: todos los activos
+  $sqlEmp = "
+    SELECT e.id, e.cedula, e.nombres, e.apellidos, e.estado,
+           c.nombre AS cargo,
+           t.nombre AS turno
+    FROM empleados e
+    JOIN cargos c ON c.id = e.cargo_id
+    LEFT JOIN turnos t ON t.id = e.turno_id
+    WHERE e.estado='ACTIVO'
+  ";
+  $paramsEmp = [];
+
+  if ($turnoId !== null) {
+    $sqlEmp .= " AND e.turno_id = ? ";
+    $paramsEmp[] = $turnoId;
+  }
+
+  $sqlEmp .= " ORDER BY e.apellidos, e.nombres ";
+
+  $stmt = $pdo->prepare($sqlEmp);
+  $stmt->execute($paramsEmp);
+  $empleados = $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
-
-$sqlEmp .= " ORDER BY e.apellidos, e.nombres ";
-
-$stmt = $pdo->prepare($sqlEmp);
-$stmt->execute($paramsEmp);
-$empleados = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 if (!$empleados) {
   $pdf = new TCPDF("P", "mm", "A4", true, "UTF-8", false);
@@ -413,6 +443,18 @@ $pdf->SetFont("helvetica", "", 10);
 $generado = date("Y-m-d H:i");
 $turnoTxt = ($turnoId === null) ? "Todos" : ("Turno ID: " . $turnoId);
 
+// ✅ Título y nombre de archivo para reporte individual
+$tituloReporte = "Reporte de Asistencia - " . $label;
+$filename = "reporte_{$desde}_{$hasta}.pdf";
+
+if ($esIndividual && count($empleados) > 0) {
+  $empNombre = trim($empleados[0]["nombres"] . " " . $empleados[0]["apellidos"]);
+  $empCedula = formatCedula($empleados[0]["cedula"]);
+  $empCedulaRaw = $empleados[0]["cedula"];
+  $tituloReporte = "Reporte Individual - " . $empNombre . " (" . $empCedula . ")";
+  $filename = "reporte_individual_" . $empCedulaRaw . "_{$desde}_{$hasta}.pdf";
+}
+
 $html = '
 <style>
   h1{font-size:16px;margin:0 0 6px 0;}
@@ -424,7 +466,7 @@ $html = '
   th{background:#f3f6fb;font-weight:bold;}
 </style>
 
-<h1>Reporte de Asistencia - '.$label.'</h1>
+<h1>'.$tituloReporte.'</h1>
 <div class="meta">
   Generado: '.$generado.'<br>
   Rango: <strong>'.$desde.'</strong> al <strong>'.$hasta.'</strong><br>
@@ -448,28 +490,70 @@ $html = '
   </table>
 </div>
 
-<h2>Resumen por empleado</h2>
+';
+
+// ✅ Si es individual, mostrar info del empleado en lugar de tabla resumen
+if ($esIndividual && count($empleados) > 0) {
+  $empInfo = $empleados[0];
+  $empNombreCompleto = htmlspecialchars(trim($empInfo["nombres"] . " " . $empInfo["apellidos"]), ENT_QUOTES, "UTF-8");
+  $empCargo = htmlspecialchars($empInfo["cargo"], ENT_QUOTES, "UTF-8");
+  $empTurno = htmlspecialchars($empInfo["turno"] ?? "—", ENT_QUOTES, "UTF-8");
+  
+  $html .= '
+<div class="box">
+  <strong>Empleado:</strong> '.$empNombreCompleto.'<br>
+  <strong>Cargo:</strong> '.$empCargo.'<br>
+  <strong>Turno:</strong> '.$empTurno.'
+</div>
+
+<h2>Resumen de asistencia</h2>
+';
+  
+  if (count($resumen) > 0) {
+    $r = $resumen[0];
+    $html .= '<div class="box">
+      <table>
+        <tr>
+          <th>Total Asistió</th><th>A tiempo</th><th>Retardos</th><th>Permisos</th><th>Reposos</th><th>Ausencias</th>
+        </tr>
+        <tr>
+          <td>'.$r["asistio"].'</td>
+          <td>'.$r["a_tiempo"].'</td>
+          <td>'.$r["retardo"].'</td>
+          <td>'.$r["permiso"].'</td>
+          <td>'.$r["reposo"].'</td>
+          <td>'.$r["ausente"].'</td>
+        </tr>
+      </table>
+    </div>';
+  }
+} else {
+  // Reporte general: mostrar resumen por empleado
+  $html .= '<h2>Resumen por empleado</h2>
 <table>
   <tr>
     <th>Cédula</th><th>Empleado</th><th>Turno</th>
     <th>Asistió</th><th>A tiempo</th><th>Tarde</th><th>Permiso</th><th>Reposo</th><th>Ausente</th>
   </tr>';
 
-foreach ($resumen as $r) {
-  $html .= '<tr>
-    <td>'.htmlspecialchars($r["cedula"], ENT_QUOTES, "UTF-8").'</td>
-    <td>'.htmlspecialchars($r["empleado"], ENT_QUOTES, "UTF-8").'</td>
-    <td>'.htmlspecialchars($r["turno"], ENT_QUOTES, "UTF-8").'</td>
-    <td>'.$r["asistio"].'</td>
-    <td>'.$r["a_tiempo"].'</td>
-    <td>'.$r["retardo"].'</td>
-    <td>'.$r["permiso"].'</td>
-    <td>'.$r["reposo"].'</td>
-    <td>'.$r["ausente"].'</td>
-  </tr>';
+  foreach ($resumen as $r) {
+    $html .= '<tr>
+      <td>'.htmlspecialchars(formatCedula($r["cedula"]), ENT_QUOTES, "UTF-8").'</td>
+      <td>'.htmlspecialchars($r["empleado"], ENT_QUOTES, "UTF-8").'</td>
+      <td>'.htmlspecialchars($r["turno"], ENT_QUOTES, "UTF-8").'</td>
+      <td>'.$r["asistio"].'</td>
+      <td>'.$r["a_tiempo"].'</td>
+      <td>'.$r["retardo"].'</td>
+      <td>'.$r["permiso"].'</td>
+      <td>'.$r["reposo"].'</td>
+      <td>'.$r["ausente"].'</td>
+    </tr>';
+  }
+
+  $html .= '</table>';
 }
 
-$html .= '</table>
+$html .= '
 
 <h2>Detalle de incidencias (no a tiempo)</h2>';
 
@@ -485,7 +569,7 @@ $html .= '<table>
 foreach ($incidencias as $i) {
   $html .= '<tr>
     <td>'.htmlspecialchars($i["fecha"], ENT_QUOTES, "UTF-8").'</td>
-    <td>'.htmlspecialchars($i["cedula"], ENT_QUOTES, "UTF-8").'</td>
+    <td>'.htmlspecialchars(formatCedula($i["cedula"]), ENT_QUOTES, "UTF-8").'</td>
     <td>'.htmlspecialchars($i["empleado"], ENT_QUOTES, "UTF-8").'</td>
     <td>'.htmlspecialchars($i["turno"], ENT_QUOTES, "UTF-8").'</td>
     <td>'.htmlspecialchars($i["estado"], ENT_QUOTES, "UTF-8").'</td>
@@ -497,6 +581,5 @@ $html .= '</table>';
 
 $pdf->writeHTML($html, true, false, true, false, '');
 
-$filename = "reporte_{$desde}_{$hasta}.pdf";
 $pdf->Output($filename, "I");
 exit;

@@ -7,6 +7,8 @@ require_once __DIR__ . "/../includes/conexion.php";
 $msg = trim($_GET["msg"] ?? "");
 $err = trim($_GET["err"] ?? "");
 $pagina = max(1, (int)($_GET["pagina"] ?? 1));
+$orden = trim($_GET["orden"] ?? "");
+$filtroEstado = trim($_GET["filtro"] ?? "");
 $porPagina = 10;
 $offset = ($pagina - 1) * $porPagina;
 
@@ -16,26 +18,46 @@ $cargos = $pdo->query("SELECT id, nombre FROM cargos ORDER BY nombre")->fetchAll
 // ✅ Turnos (incluye Turnos Nocturnos)
 $turnos = $pdo->query("SELECT id, nombre FROM turnos ORDER BY id")->fetchAll(PDO::FETCH_ASSOC);
 
-// Personal (incluye turno) con paginacion
-$stmtTotal = $pdo->query("SELECT COUNT(*) AS total FROM empleados");
+// ✅ Filtro por estado
+$whereEstado = "";
+$paramsTotal = [];
+if ($filtroEstado === "SUSPENDIDO") {
+  $whereEstado = " WHERE estado = 'SUSPENDIDO'";
+} elseif ($filtroEstado === "RETIRADO") {
+  $whereEstado = " WHERE estado = 'RETIRADO'";
+}
+
+// Personal con paginacion y ordenamiento
+$stmtTotal = $pdo->prepare("SELECT COUNT(*) AS total FROM empleados" . $whereEstado);
+$stmtTotal->execute($paramsTotal);
 $totalPersonal = (int)($stmtTotal->fetch(PDO::FETCH_ASSOC)["total"] ?? 0);
 $totalPaginas = ceil($totalPersonal / $porPagina);
 
-$personal = $pdo->query("
-  SELECT e.id, e.cedula,
+// ✅ Determinar orden: por cargo o alfabético
+$orderClause = "ORDER BY e.apellidos, e.nombres";
+if ($orden === "jerarquia") {
+  $orderClause = "ORDER BY c.nombre ASC, e.apellidos ASC, e.nombres ASC";
+} elseif ($orden === "alfabetico") {
+  $orderClause = "ORDER BY e.nombres ASC, e.apellidos ASC";
+}
+
+$personal = $pdo->prepare("
+  SELECT e.id, e.cedula, e.estado,
          CONCAT(
            UCASE(LEFT(TRIM(e.nombres),1)), SUBSTRING(TRIM(e.nombres),2), ' ',
            UCASE(LEFT(TRIM(e.apellidos),1)), SUBSTRING(TRIM(e.apellidos),2)
          ) AS nombre,
          c.nombre AS cargo,
-         t.nombre AS turno,
-         e.estado
+         t.nombre AS turno
   FROM empleados e
   JOIN cargos c ON c.id = e.cargo_id
   LEFT JOIN turnos t ON t.id = e.turno_id
-  ORDER BY e.apellidos, e.nombres
+  $whereEstado
+  $orderClause
   LIMIT $porPagina OFFSET $offset
-")->fetchAll(PDO::FETCH_ASSOC);
+");
+$personal->execute($paramsTotal);
+$personal = $personal->fetchAll(PDO::FETCH_ASSOC);
 
 $mostrandoInicio = $offset + 1;
 $mostrandoFin = min($offset + $porPagina, $totalPersonal);
@@ -112,6 +134,9 @@ require_once __DIR__ . "/../includes/header.php";
   .btn-activar{ background:#dcfce7; border-color:#bbf7d0; color:#166534; }
   .btn-suspender{ background:#fef3c7; border-color:#fde68a; color:#92400e; }
   .btn-retirar{ background:#fee2e2; border-color:#fecaca; color:#991b1b; }
+
+  .status-suspended{background:#fef3c7;color:#92400e}
+  .status-retired{background:#fee2e2;color:#991b1b}
 
   .pagination{display:flex;justify-content:space-between;align-items:center;margin-top:14px;padding-top:14px;border-top:1px solid #e5e7eb}
   .pagination-info{color:#6b7280;font-size:13px;font-weight:900}
@@ -198,9 +223,47 @@ require_once __DIR__ . "/../includes/header.php";
     </div>
   </div>
 
-  <div class="card table-card">
-    <div class="table-title">Listado de Personal</div>
-    <p class="table-sub">Listado de personal registrado.</p>
+    <div class="card table-card">
+      <div class="table-title">Listado de Personal</div>
+      <p class="table-sub">
+        <?php if ($filtroEstado === "SUSPENDIDO"): ?>
+          Personal suspendido registrado.
+        <?php elseif ($filtroEstado === "RETIRADO"): ?>
+          Personal retirado registrado.
+        <?php else: ?>
+          Listado de personal registrado.
+        <?php endif; ?>
+      </p>
+
+    <!-- ✅ Controles de ordenamiento y filtros -->
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+      <a href="<?php echo BASE_URL; ?>/modulos/personal.php?pagina=1<?php echo $orden === 'jerarquia' ? '' : '&orden=jerarquia'; ?><?php echo $filtroEstado !== '' ? '&filtro=' . $filtroEstado : ''; ?>" 
+         class="btn <?php echo $orden === 'jerarquia' ? 'btn-primary' : 'btn-light'; ?>" 
+         style="font-size:12px;padding:8px 12px">
+        Orden por Cargo
+      </a>
+      <a href="<?php echo BASE_URL; ?>/modulos/personal.php?pagina=1<?php echo $orden === 'alfabetico' ? '' : '&orden=alfabetico'; ?><?php echo $filtroEstado !== '' ? '&filtro=' . $filtroEstado : ''; ?>" 
+         class="btn <?php echo $orden === 'alfabetico' ? 'btn-primary' : 'btn-light'; ?>" 
+         style="font-size:12px;padding:8px 12px">
+        Orden Alfabético
+      </a>
+      <div style="border-left:1px solid #d6dee8;margin:0 4px"></div>
+      <a href="<?php echo BASE_URL; ?>/modulos/personal.php?pagina=1&filtro=SUSPENDIDO<?php echo $orden !== '' ? '&orden=' . $orden : ''; ?>" 
+         class="btn <?php echo $filtroEstado === 'SUSPENDIDO' ? 'btn-primary' : 'btn-light'; ?>" 
+         style="font-size:12px;padding:8px 12px">
+        Suspendidos
+      </a>
+      <a href="<?php echo BASE_URL; ?>/modulos/personal.php?pagina=1&filtro=RETIRADO<?php echo $orden !== '' ? '&orden=' . $orden : ''; ?>" 
+         class="btn <?php echo $filtroEstado === 'RETIRADO' ? 'btn-primary' : 'btn-light'; ?>" 
+         style="font-size:12px;padding:8px 12px">
+        Retirados
+      </a>
+      <a href="<?php echo BASE_URL; ?>/modulos/personal.php?pagina=1" 
+         class="btn btn-light" 
+         style="font-size:12px;padding:8px 12px">
+        Mostrar Todos
+      </a>
+    </div>
 
     <table>
       <thead>
@@ -208,7 +271,7 @@ require_once __DIR__ . "/../includes/header.php";
           <th>Nombre</th>
           <th>Cédula</th>
           <th>Cargo</th>
-          <th>Turno</th> <!-- ✅ NUEVO -->
+          <th>Turno</th>
           <th>Estado</th>
           <th>Acción</th>
         </tr>
@@ -221,11 +284,16 @@ require_once __DIR__ . "/../includes/header.php";
         <?php foreach ($personal as $p): ?>
           <tr>
             <td><?php echo e($p["nombre"]); ?></td>
-            <td><?php echo e($p["cedula"]); ?></td>
+            <td><?php echo e(formatCedula($p["cedula"])); ?></td>
             <td><?php echo e($p["cargo"]); ?></td>
-            <td><?php echo e($p["turno"] ?: "—"); ?></td> <!-- Turno del empleado -->
+            <td><?php echo e($p["turno"] ?: "—"); ?></td>
             <td>
-              <span class="pill <?php echo ($p["estado"] === "ACTIVO") ? "status-present" : "status-rest"; ?>">
+              <?php
+                $pillClass = "status-present";
+                if ($p["estado"] === "SUSPENDIDO") $pillClass = "status-suspended";
+                elseif ($p["estado"] === "RETIRADO") $pillClass = "status-retired";
+              ?>
+              <span class="pill <?php echo $pillClass; ?>">
                 <?php echo e($p["estado"]); ?>
               </span>
             </td>
@@ -259,7 +327,11 @@ require_once __DIR__ . "/../includes/header.php";
       <div class="pagination-pages">
         <?php
           function buildUrl($pag) {
-            return BASE_URL . "/modulos/personal.php?pagina=" . $pag;
+            global $orden, $filtroEstado;
+            $params = ["pagina" => $pag];
+            if ($orden !== "") $params["orden"] = $orden;
+            if ($filtroEstado !== "") $params["filtro"] = $filtroEstado;
+            return BASE_URL . "/modulos/personal.php?" . http_build_query($params);
           }
         ?>
         <a href="<?php echo buildUrl($pagina - 1); ?>" class="<?php echo $pagina <= 1 ? 'disabled' : ''; ?>">‹ Anterior</a>

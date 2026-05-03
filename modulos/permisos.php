@@ -221,7 +221,7 @@ require_once __DIR__ . "/../includes/header.php";
               <option value="">Selecciona un empleado...</option>
               <?php foreach($empleados as $e): ?>
                 <option value="<?php echo (int)$e["id"]; ?>">
-                  <?php echo e($e["nombre"]); ?> — <?php echo e($e["cedula"]); ?> (<?php echo e($e["cargo"]); ?>)
+                  <?php echo e($e["nombre"]); ?> — <?php echo e(formatCedula($e["cedula"])); ?> (<?php echo e($e["cargo"]); ?>)
                 </option>
               <?php endforeach; ?>
             </select>
@@ -290,7 +290,7 @@ require_once __DIR__ . "/../includes/header.php";
           <?php foreach($permisos as $p): ?>
             <tr>
               <td><?php echo e($p["empleado"]); ?></td>
-              <td><?php echo e($p["cedula"]); ?></td>
+              <td><?php echo e(formatCedula($p["cedula"])); ?></td>
               <td><?php echo e($p["cargo"]); ?></td>
               <td><?php echo e($p["tipo"]); ?></td>
               <td><?php echo e($p["fecha_inicio"]); ?></td>

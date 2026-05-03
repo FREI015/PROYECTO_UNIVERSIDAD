@@ -1,0 +1,36 @@
+Quiero mejorar mi sistema de control de asistencia en PHP y MySQL.
+
+Necesito que hagas lo siguiente sobre mi código existente sin romper la lógica actual:
+
+1. Implementar un "modo emergencia" en el módulo de asistencia:
+
+* Agregar un botón "Modo Emergencia"
+* Al hacer clic, solicitar usuario y contraseña de un administrador
+* Validar contra la tabla usuarios (rol = admin)
+* Si es correcto, activar una variable de sesión $_SESSION['modo_emergencia'] = true
+* Permitir registrar asistencia aunque el sistema esté restringido
+
+2. Implementar filtros en la consulta de empleados:
+
+* Agregar orden por jerarquía (ORDER BY jerarquia ASC)
+* Agregar orden alfabético (ORDER BY nombre ASC)
+* Usar parámetros GET (?orden=jerarquia o ?orden=alfabetico)
+* Mantener compatibilidad con paginación existente
+
+3. Corregir el filtro de reposos:
+
+* Revisar por qué no filtra correctamente los empleados en reposo
+* Asegurar que el campo reposo (o estado similar) se esté usando correctamente en el WHERE
+* Validar que el valor recibido coincida con la base de datos
+* Evitar que el filtro falle cuando no se envía parámetro
+
+4. Crear reporte individual:
+
+* Agregar botón "Ver Reporte" en cada empleado
+* Crear archivo reporte_individual.php
+* Recibir id del empleado por GET
+* Mostrar sus registros de asistencia
+* Agregar botón para imprimir (window.print())
+
+No elimines funcionalidades existentes.
+Comenta el código nuevo que agregues.

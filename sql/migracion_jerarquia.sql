@@ -1,0 +1,19 @@
+-- sql/migracion_jerarquia.sql
+-- Agrega campo jerarquia a la tabla empleados para ordenamiento
+
+USE control_asistencia;
+
+ALTER TABLE empleados 
+  ADD COLUMN IF NOT EXISTS jerarquia INT NOT NULL DEFAULT 5 
+  COMMENT 'Nivel de jerarquia: 1=Mayor, 5=Menor (menor numero = mayor jerarquia)';
+
+-- Valores por defecto basados en cargos comunes
+UPDATE empleados e
+JOIN cargos c ON c.id = e.cargo_id
+SET e.jerarquia = CASE
+  WHEN LOWER(c.nombre) LIKE '%director%' THEN 1
+  WHEN LOWER(c.nombre) LIKE '%subdirector%' THEN 2
+  WHEN LOWER(c.nombre) LIKE '%coordinador%' THEN 3
+  WHEN LOWER(c.nombre) LIKE '%docente%' THEN 4
+  ELSE 5
+END;

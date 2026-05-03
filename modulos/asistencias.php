@@ -14,12 +14,14 @@ $hoy = date("Y-m-d");
 
 $msg = trim($_GET["msg"] ?? "");
 $err = trim($_GET["err"] ?? "");
+$modoEmergencia = !empty($_SESSION['modo_emergencia']);
 
 $q = trim($_GET["q"] ?? "");
 $estadoFiltro = trim($_GET["estado"] ?? "");
 $turnoFiltro  = trim($_GET["turno"] ?? "");
 $desde = trim($_GET["desde"] ?? "");
 $hasta = trim($_GET["hasta"] ?? "");
+$orden = trim($_GET["orden"] ?? "");
 $pagina = max(1, (int)($_GET["pagina"] ?? 1));
 $porPagina = 10;
 $offset = ($pagina - 1) * $porPagina;
@@ -121,6 +123,23 @@ if ($turnoFiltro !== "") {
   $params[] = (int)$turnoFiltro;
 }
 
+// ✅ Filtro de estado en SQL (match original PHP logic with priority)
+if ($estadoFiltro === "REPOSO") {
+  $where[] = "e.estado = 'ACTIVO' AND r.reposo_id IS NOT NULL";
+} elseif ($estadoFiltro === "PERMISO") {
+  $where[] = "e.estado = 'ACTIVO' AND p.permiso_id IS NOT NULL AND r.reposo_id IS NULL";
+} elseif ($estadoFiltro === "RETARDO") {
+  $where[] = "e.estado = 'ACTIVO' AND a.es_retardo = 1 AND r.reposo_id IS NULL AND p.permiso_id IS NULL";
+} elseif ($estadoFiltro === "EN_SERVICIO") {
+  $where[] = "e.estado = 'ACTIVO' AND a.es_asistio = 1 AND a.es_retardo = 0 AND r.reposo_id IS NULL AND p.permiso_id IS NULL";
+} elseif ($estadoFiltro === "AUSENTE") {
+  $where[] = "e.estado = 'ACTIVO' AND (a.es_asistio IS NULL OR a.es_asistio = 0) AND (a.es_retardo IS NULL OR a.es_retardo = 0) AND r.reposo_id IS NULL AND p.permiso_id IS NULL";
+} elseif ($estadoFiltro === "DESINCORPORADO") {
+  $where[] = "e.estado = 'RETIRADO'";
+} elseif ($estadoFiltro === "SUSPENDIDO") {
+  $where[] = "e.estado = 'SUSPENDIDO'";
+}
+
 $sqlBase = "
 SELECT
   e.id,
@@ -183,7 +202,15 @@ $totalEmpleados = (int)($stmtCount->fetch(PDO::FETCH_ASSOC)["total"] ?? 0);
 
 $sql = $sqlBase;
 if (!empty($where)) $sql .= " WHERE " . implode(" AND ", $where);
-$sql .= " ORDER BY e.apellidos, e.nombres LIMIT $porPagina OFFSET $offset";
+
+// ✅ Ordenamiento: jerarquia, alfabético o default
+$orderClause = "ORDER BY e.apellidos, e.nombres";
+if ($orden === "jerarquia") {
+  $orderClause = "ORDER BY e.jerarquia ASC, e.apellidos, e.nombres";
+} elseif ($orden === "alfabetico") {
+  $orderClause = "ORDER BY e.nombres ASC, e.apellidos ASC";
+}
+$sql .= " $orderClause LIMIT $porPagina OFFSET $offset";
 
 $stmt = $pdo->prepare($sql);
 $stmt->execute($paramsFinal);
@@ -213,20 +240,6 @@ foreach ($rows as $row) {
     } else {
       $status = "Ausente";
     }
-  }
-
-  if ($estadoFiltro !== "") {
-    $map = [
-      "EN_SERVICIO"     => "En Servicio",
-      "RETARDO"         => "Retardo",
-      "REPOSO"          => "Reposo",
-      "PERMISO"         => "Permiso",
-      "AUSENTE"         => "Ausente",
-      "DESINCORPORADO"  => "Desincorporado",
-      "SUSPENDIDO"      => "Suspendido",
-    ];
-    $want = $map[$estadoFiltro] ?? "";
-    if ($want !== "" && $status !== $want) continue;
   }
 
   if ($desde !== "" || $hasta !== "") {
@@ -290,6 +303,21 @@ foreach ($rows as $row) {
   .out{background:#ef4444;color:#fff}
   .muted{opacity:.75;font-size:12px;margin-top:6px}
 
+  /* ===== MODO EMERGENCIA ===== */
+  .btn-emergency{background:#dc2626;color:#fff;border:none;padding:10px 14px;border-radius:12px;cursor:pointer;font-weight:900;font-size:13px}
+  .btn-emergency:hover{filter:brightness(1.1)}
+  .btn-emergency.active{background:#f59e0b;color:#111}
+  .emergency-bar{background:#fef3c7;border:2px solid #f59e0b;border-radius:12px;padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;font-weight:900;color:#92400e}
+  .emergency-bar .btn{margin-left:10px}
+  .modal-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:9999}
+  .modal-overlay.show{display:flex}
+  .modal-box{background:#fff;border-radius:16px;padding:24px;max-width:400px;width:90%;box-shadow:0 10px 40px rgba(0,0,0,.2)}
+  .modal-box h3{margin:0 0 12px;font-size:18px}
+  .modal-box .field{margin-bottom:12px}
+  .modal-box .field label{display:block;font-size:12px;font-weight:700;margin-bottom:4px}
+  .modal-box .field input{width:100%;padding:10px 12px;border:1px solid #d6dee8;border-radius:10px}
+  .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:16px}
+
   .pagination{display:flex;justify-content:space-between;align-items:center;margin-top:14px;padding-top:14px;border-top:1px solid #e5e7eb}
   .pagination-info{color:#6b7280;font-size:13px;font-weight:900}
   .pagination-pages{display:flex;gap:6px}
@@ -323,6 +351,21 @@ foreach ($rows as $row) {
   <?php if ($msg): ?><div class="alert ok"><?php echo e($msg); ?></div><?php endif; ?>
   <?php if ($err): ?><div class="alert bad"><?php echo e($err); ?></div><?php endif; ?>
 
+  <!-- ===== MODO EMERGENCIA: BARRA Y BOTÓN ===== -->
+  <?php if ($modoEmergencia): ?>
+  <div class="emergency-bar">
+    <span>⚠️ MODO EMERGENCIA ACTIVO — Puedes registrar asistencia sin restricciones</span>
+    <form method="POST" action="../procesos/modo_emergencia.php" style="display:inline">
+      <input type="hidden" name="accion" value="desactivar">
+      <button class="btn btnL" type="submit">Desactivar</button>
+    </form>
+  </div>
+  <?php else: ?>
+  <div style="margin-bottom:14px;text-align:right">
+    <button class="btn-emergency" id="btnModoEmergencia">Modo Emergencia</button>
+  </div>
+  <?php endif; ?>
+
   <form class="filters-grid" method="GET">
     <input class="input" name="q" value="<?php echo e($q); ?>" placeholder="Buscar por nombre, cargo o cédula...">
 
@@ -352,6 +395,25 @@ foreach ($rows as $row) {
     <button class="btn btnP" type="submit">Filtrar</button>
     <a class="btn btnL" href="asistencias.php">Limpiar</a>
   </form>
+
+  <!-- ✅ Controles de ordenamiento -->
+  <div style="display:flex;gap:8px;margin:12px 0;flex-wrap:wrap">
+    <a href="?pagina=1<?php echo $orden === 'jerarquia' ? '' : '&orden=jerarquia'; ?>"
+       class="btn <?php echo $orden === 'jerarquia' ? 'btnP' : 'btnL'; ?>"
+       style="font-size:12px;padding:8px 12px">
+      Orden por Jerarquía
+    </a>
+    <a href="?pagina=1<?php echo $orden === 'alfabetico' ? '' : '&orden=alfabetico'; ?>"
+       class="btn <?php echo $orden === 'alfabetico' ? 'btnP' : 'btnL'; ?>"
+       style="font-size:12px;padding:8px 12px">
+      Orden Alfabético
+    </a>
+    <a href="?pagina=1"
+       class="btn btnL"
+       style="font-size:12px;padding:8px 12px">
+      Limpiar
+    </a>
+  </div>
 
   <table>
     <thead>
@@ -399,7 +461,7 @@ foreach ($rows as $row) {
         ?>
         <tr>
           <td><?php echo e($nombre); ?></td>
-          <td><?php echo e($e["cedula"]); ?></td>
+          <td><?php echo e(formatCedula($e["cedula"])); ?></td>
           <td><?php echo e($e["cargo"]); ?></td>
           <td><?php echo e($turnoNombre); ?></td>
           <td><span class="pill <?php echo e($class); ?>"><?php echo e($label); ?></span></td>
@@ -435,7 +497,9 @@ foreach ($rows as $row) {
     <div class="pagination-pages">
       <?php
         function buildUrl($params, $pag) {
+          global $orden;
           $params["pagina"] = $pag;
+          if ($orden !== "") $params["orden"] = $orden;
           return BASE_URL . "/modulos/asistencias.php?" . http_build_query($params);
         }
         $filters = array_filter([
@@ -455,5 +519,42 @@ foreach ($rows as $row) {
   </div>
   <?php endif; ?>
 </div>
+
+<!-- ===== MODAL MODO EMERGENCIA ===== -->
+<div class="modal-overlay" id="modalEmergencia">
+  <div class="modal-box">
+    <h3>Modo Emergencia</h3>
+    <p style="font-size:13px;color:#6b7280;margin-bottom:14px">Ingresa credenciales de administrador (DIRECTORA o SUPER) para activar.</p>
+    <form method="POST" action="../procesos/modo_emergencia.php">
+      <input type="hidden" name="accion" value="activar">
+      <div class="field">
+        <label>Usuario</label>
+        <input type="text" name="usuario" required placeholder="Usuario administrador">
+      </div>
+      <div class="field">
+        <label>Contraseña</label>
+        <input type="password" name="clave" required placeholder="Contraseña">
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btnL" id="btnCerrarModal">Cancelar</button>
+        <button type="submit" class="btn btnP">Activar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+// ===== MODO EMERGENCIA: MODAL =====
+(function(){
+  var btn = document.getElementById('btnModoEmergencia');
+  var modal = document.getElementById('modalEmergencia');
+  var cerrar = document.getElementById('btnCerrarModal');
+  if (btn && modal) {
+    btn.addEventListener('click', function(){ modal.classList.add('show'); });
+    if (cerrar) cerrar.addEventListener('click', function(){ modal.classList.remove('show'); });
+    modal.addEventListener('click', function(e){ if(e.target === modal) modal.classList.remove('show'); });
+  }
+})();
+</script>
 
 <?php require_once __DIR__ . "/../includes/footer.php"; ?>
