@@ -37,7 +37,6 @@ $fondo  = BASE_URL . "/assets/img/Gemini_Generated_Image_3t4ws33t4ws33t4w.png";
 
 *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',Tahoma,Verdana,sans-serif}
 
-/* ===== FONDO CON IMAGEN ===== */
 body{
   min-height:100vh;
   background:
@@ -47,7 +46,6 @@ body{
   flex-direction:column;
 }
 
-/* ===== TOPBAR (SIN NAV NEGRO) ===== */
 .topbar{
   background:rgba(11,110,253,.95);
   color:#fff;
@@ -73,7 +71,6 @@ body{
   font-weight:950;
 }
 
-/* ===== CONTENIDO ===== */
 .wrap{
   flex:1;
   display:flex;
@@ -82,7 +79,6 @@ body{
   padding:24px;
 }
 
-/* ===== CARD LOGIN ===== */
 .card{
   width:min(460px,96vw);
   background:rgba(255,255,255,.95);
@@ -177,6 +173,7 @@ label{
     <?php endif; ?>
 
     <form method="POST" action="<?php echo e($ACTION); ?>">
+    <?php echo csrfInput(); ?>
       <input type="hidden" name="next" value="<?php echo e($next); ?>">
 
       <label>Usuario</label>

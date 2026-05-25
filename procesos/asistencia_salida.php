@@ -9,6 +9,9 @@ if ($_SERVER["REQUEST_METHOD"] !== "POST") {
   exit;
 }
 
+verifyCsrfOrRedirect(BASE_URL . "/modulos/asistencias.php?err=" . urlencode("Solicitud inválida. Intenta nuevamente."));
+requirePermiso("marcar_asistencia", BASE_URL . "/modulos/asistencias.php");
+
 $empleado_id = (int)($_POST["empleado_id"] ?? 0);
 if ($empleado_id <= 0) {
   header("Location: " . BASE_URL . "/modulos/asistencias.php?err=" . urlencode("Empleado inválido"));
@@ -22,7 +25,7 @@ $hoy_real = $now->format("Y-m-d");
 $hora_now = $now->format("H:i:s");
 
 $stmt = $pdo->prepare("
-  SELECT e.estado, t.hora_inicio, t.hora_fin
+  SELECT e.estado, e.turno_id, t.nombre AS turno_nombre, t.hora_inicio, t.hora_fin
   FROM empleados e
   LEFT JOIN turnos t ON t.id = e.turno_id
   WHERE e.id = ?
@@ -41,6 +44,10 @@ if (strtoupper(trim((string)$emp["estado"])) !== "ACTIVO") {
   exit;
 }
 
+if (!puedeVerTurno($emp["turno_nombre"] ?? "")) {
+    header("Location: " . BASE_URL . "/modulos/asistencias.php?err=" . urlencode("No tienes permiso para marcar asistencia de este turno"));
+    exit;
+}
 $horaInicio = $emp["hora_inicio"] ?: "07:00:00";
 $horaFin    = $emp["hora_fin"] ?: null;
 
@@ -101,5 +108,5 @@ $upd = $pdo->prepare("
 ");
 $upd->execute([$hora_now, $horas_trab, (int)$row["id"]]);
 
-header("Location: " . BASE_URL . "/modulos/asistencias.php?msg=" . urlencode("Salida registrada"));
+header("Location: " . BASE_URL . "/modulos/asistencias.php?msg=" . urlencode("Salida registrada con exito") . "&ok_asistencia=salida&empleado_id=" . $empleado_id . "&estado=" . urlencode((string)$row["estado"]) . "&hora=" . urlencode($hora_now));
 exit;

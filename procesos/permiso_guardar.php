@@ -10,7 +10,28 @@ if ($_SERVER["REQUEST_METHOD"] !== "POST") {
   exit;
 }
 
+verifyCsrfOrRedirect(BASE_URL . "/modulos/permisos.php?err=" . urlencode("Solicitud inválida. Intenta nuevamente."));
+// 24A3_PERMISO_GUARDAR_PERMISO
+requirePermiso("ver_permisos", BASE_URL . "/modulos/permisos.php");
+
 $empleado_id = (int)($_POST["empleado_id"] ?? 0);
+// 24A3_PERMISO_GUARDAR_TURNO_SCOPE
+if ($empleado_id > 0) {
+  $stmtEmpScope = $pdo->prepare("
+    SELECT t.nombre
+    FROM empleados e
+    LEFT JOIN turnos t ON t.id = e.turno_id
+    WHERE e.id = ?
+    LIMIT 1
+  ");
+  $stmtEmpScope->execute([$empleado_id]);
+  $turnoNombreScope = (string)$stmtEmpScope->fetchColumn();
+
+  if (!puedeVerTurno($turnoNombreScope)) {
+    header("Location: " . BASE_URL . "/modulos/permisos.php?err=" . urlencode("No tienes permiso para registrar este movimiento para ese turno."));
+    exit;
+  }
+}
 $tipo = trim((string)($_POST["tipo"] ?? ""));
 $fecha_inicio = trim((string)($_POST["fecha_inicio"] ?? ""));
 $fecha_fin = trim((string)($_POST["fecha_fin"] ?? ""));
@@ -27,7 +48,7 @@ if ($fecha_fin < $fecha_inicio) {
   exit;
 }
 
-// ✅ Validar estado del empleado
+// Valida que el empleado esté activo.
 $st = $pdo->prepare("SELECT estado FROM empleados WHERE id=? LIMIT 1");
 $st->execute([$empleado_id]);
 $emp = $st->fetch(PDO::FETCH_ASSOC);

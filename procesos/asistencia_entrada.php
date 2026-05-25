@@ -9,6 +9,9 @@ if ($_SERVER["REQUEST_METHOD"] !== "POST") {
   exit;
 }
 
+verifyCsrfOrRedirect(BASE_URL . "/modulos/asistencias.php?err=" . urlencode("Solicitud inválida. Intenta nuevamente."));
+requirePermiso("marcar_asistencia", BASE_URL . "/modulos/asistencias.php");
+
 $empleado_id = (int)($_POST["empleado_id"] ?? 0);
 if ($empleado_id <= 0) {
   header("Location: " . BASE_URL . "/modulos/asistencias.php?err=" . urlencode("Empleado inválido"));
@@ -16,7 +19,7 @@ if ($empleado_id <= 0) {
 }
 
 /**
- * ✅ Hora/fecha SIEMPRE Caracas
+ * Hora y fecha calculadas con zona horaria de Caracas.
  */
 $tz = new DateTimeZone("America/Caracas");
 $now = new DateTimeImmutable("now", $tz);
@@ -29,7 +32,7 @@ $registrado_por = $uid > 0 ? $uid : null;
 
 // 1) Validar empleado y turno (para retardo)
 $stmt = $pdo->prepare("
-  SELECT e.estado, e.turno_id, t.hora_inicio, t.hora_fin
+  SELECT e.estado, e.turno_id, t.nombre AS turno_nombre, t.hora_inicio, t.hora_fin
   FROM empleados e
   LEFT JOIN turnos t ON t.id = e.turno_id
   WHERE e.id = ?
@@ -49,7 +52,11 @@ if ($estadoEmp !== "ACTIVO") {
   exit;
 }
 
-// ✅ MODO EMERGENCIA: saltar restricciones si está activo
+if (!puedeVerTurno($emp["turno_nombre"] ?? "")) {
+    header("Location: " . BASE_URL . "/modulos/asistencias.php?err=" . urlencode("No tienes permiso para marcar asistencia de este turno"));
+    exit;
+}
+// Modo emergencia: omite restricciones de reposo y permiso.
 $modoEmergencia = !empty($_SESSION['modo_emergencia']);
 
 // 2) Bloquear si tiene reposo/permiso activo HOY (fecha real) — sauf modo emergencia
@@ -74,7 +81,7 @@ $horaInicio = $emp["hora_inicio"] ?: "07:00:00";
 $horaFin    = $emp["hora_fin"] ?: null;
 
 /**
- * ✅ Define la fecha de asistencia (soporta turnos nocturnos que cruzan medianoche)
+ * Define la fecha de asistencia para turnos que cruzan medianoche.
  * Ej: NOCTURNO 18:00 -> 06:00
  * Si son las 02:00, esa asistencia pertenece al día anterior (fecha de inicio del turno).
  */
@@ -93,7 +100,7 @@ if ($horaFin !== null) {
 }
 
 /**
- * ✅ Tolerancia sin romper si la constante NO existe
+ * Usa tolerancia configurada cuando esté disponible.
  * (Este es el FIX de tu error)
  */
 $tolMin = 0;
@@ -105,12 +112,25 @@ if (defined("RETARDO_TOLERANCIA_MINUTOS")) {
 $inicioTurno = new DateTimeImmutable($fecha_asistencia . " " . $horaInicio, $tz);
 $limite = $inicioTurno->modify("+" . $tolMin . " minutes");
 
+$margenAntesMin = 0;
+if (defined("ASISTENCIA_MARGEN_ANTES_MINUTOS")) {
+    $margenAntesMin = max(0, (int) constant("ASISTENCIA_MARGEN_ANTES_MINUTOS"));
+}
+
+$inicioPermitido = $inicioTurno->modify("-" . $margenAntesMin . " minutes");
+
+if ($now->getTimestamp() < $inicioPermitido->getTimestamp()) {
+    header("Location: " . BASE_URL . "/modulos/asistencias.php?err=" . urlencode("Aun no esta dentro del margen permitido para marcar entrada"));
+    exit;
+}
+
 // Estado por defecto
 $min_tarde = 0;
 $estado = "ASISTIO";
 
 if ($now->getTimestamp() > $limite->getTimestamp()) {
-  $min_tarde = (int) floor(($now->getTimestamp() - $limite->getTimestamp()) / 60);
+  $segundosTarde = $now->getTimestamp() - $limite->getTimestamp();
+  $min_tarde = max(1, (int) ceil($segundosTarde / 60));
   $estado = "RETARDO";
 }
 
@@ -135,5 +155,5 @@ if ($row) {
   $ins->execute([$empleado_id, $fecha_asistencia, $estado, $hora_now, $min_tarde, $registrado_por]);
 }
 
-header("Location: " . BASE_URL . "/modulos/asistencias.php?msg=" . urlencode("Entrada registrada"));
+header("Location: " . BASE_URL . "/modulos/asistencias.php?msg=" . urlencode("Asistencia guardada con exito") . "&ok_asistencia=entrada&empleado_id=" . $empleado_id . "&estado=" . urlencode($estado) . "&hora=" . urlencode($hora_now) . "&min_tarde=" . $min_tarde);
 exit;

@@ -58,7 +58,6 @@ $logoutUrl = BASE_URL . "/procesos/logout.php";
     }
     .brand .t1{font-weight:950;font-size:20px;line-height:1}
 
-    /* ✅ SOLO CAMBIÉ ESTA ZONA (userbox) */
     .userbox{
       display:flex;
       align-items:center;
@@ -182,41 +181,74 @@ $logoutUrl = BASE_URL . "/procesos/logout.php";
     .btn-primary{background:var(--blue);color:#fff;box-shadow:var(--shadow2)}
     .btn-light{background:#eef2f7;color:#111;border-color:#d6dee8}
   </style>
+  <link rel="stylesheet" href="<?php echo e(BASE_URL); ?>/assets/css/app-theme.css?v=25A2P10">
 </head>
 <body>
 
-  <div class="topbar">
-    <div class="brand">
-      <img src="<?php echo e($logo); ?>" alt="Logo">
-      <div><div class="t1">Control de Asistencia</div></div>
-    </div>
+<?php
+  $headerUser = usuarioActual();
+  $headerUsuarioNombre = trim((string)($headerUser["usuario"] ?? ($_SESSION["usuario"] ?? "Usuario")));
+  $headerRol = rolActual();
+  $headerRolesDisponibles = function_exists("rolesUsuarioDisponibles") ? rolesUsuarioDisponibles() : [];
+  $headerRolLabel = $headerRolesDisponibles[$headerRol] ?? $headerRol;
+  $headerTurnos = turnosPermitidosPorRol();
+  if (tieneAlcanceGlobalTurnos()) {
+    $headerAlcanceTexto = "Alcance general";
+  } elseif ($headerTurnos !== []) {
+    $headerAlcanceTexto = "Turno " . implode(", ", $headerTurnos);
+  } else {
+    $headerAlcanceTexto = "Sin alcance asignado";
+  }
+  $headerFecha = date("d/m/Y");
+?>
 
-    <div class="userbox">
-      <div class="usercard">
-        <div class="avatar"><?php echo e($inicial); ?></div>
-        <div class="uinfo">
-          <div class="u"><?php echo e($usuario); ?></div>
-          <div class="r">Rol: <?php echo e($rol); ?></div>
-        </div>
-      </div>
+<header class="app-topline">
+  <div class="app-topline-inner">
+    <a class="app-brand" href="<?php echo e(BASE_URL); ?>/index.php" aria-label="Inicio">
+      <span class="app-brand-logo">
+        <img src="<?php echo e($logo); ?>" alt="Logo institucional">
+      </span>
+      <span class="app-brand-copy">
+        <strong>Control de Asistencia</strong>
+        <small>Panel operativo</small>
+      </span>
+    </a>
 
-      <button class="btn-salir" onclick="window.location.href='<?php echo e($logoutUrl); ?>'">
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M10 17l5-5-5-5"></path>
-          <path d="M15 12H3"></path>
-          <path d="M21 3v18"></path>
-        </svg>
-        Salir
-      </button>
+    <nav class="app-main-nav" aria-label="Navegacion principal">
+      <a class="<?php echo $active==='inicio'?'active':''; ?>" href="<?php echo e(BASE_URL); ?>/index.php">Inicio</a>
+      <a class="<?php echo $active==='asistencias'?'active':''; ?>" href="<?php echo e(BASE_URL); ?>/modulos/asistencias.php">Asistencias</a>
+
+      <?php if (puede("ver_permisos")): ?>
+        <a class="<?php echo $active==='permisos'?'active':''; ?>" href="<?php echo e(BASE_URL); ?>/modulos/permisos.php">Permisos</a>
+      <?php endif; ?>
+
+      <?php if (puede("ver_reposos")): ?>
+        <a class="<?php echo $active==='reposos'?'active':''; ?>" href="<?php echo e(BASE_URL); ?>/modulos/reposos.php">Reposos</a>
+      <?php endif; ?>
+
+      <?php if (puede("ver_reportes")): ?>
+        <a class="<?php echo $active==='reportes'?'active':''; ?>" href="<?php echo e(BASE_URL); ?>/modulos/reportes.php">Reportes</a>
+      <?php endif; ?>
+
+      <?php if (puede("ver_personal")): ?>
+        <a class="<?php echo $active==='personal'?'active':''; ?>" href="<?php echo e(BASE_URL); ?>/modulos/personal.php">Personal</a>
+      <?php endif; ?>
+
+      <?php if (usuarioPuedeAccederModuloUsuarios()): ?>
+        <a class="<?php echo $active==='usuarios'?'active':''; ?>" href="<?php echo e(BASE_URL); ?>/modulos/usuarios.php">Usuarios</a>
+      <?php endif; ?>
+    </nav>
+
+    <div class="app-user-actions">
+      <span class="app-user-identity">
+        <span class="app-user-role"><?php echo e($headerRolLabel); ?></span>
+        <span class="app-user-meta"><?php echo e($headerAlcanceTexto); ?> | <?php echo e($headerFecha); ?></span>
+      </span>
+      <a class="app-logout" href="<?php echo e($logoutUrl); ?>">Salir</a>
     </div>
   </div>
+</header>
 
-  <div class="nav">
-    <a class="<?php echo $active==='asistencias'?'active':''; ?>" href="<?php echo e(BASE_URL); ?>/modulos/asistencias.php">Asistencias</a>
-    <a class="<?php echo $active==='permisos'?'active':''; ?>" href="<?php echo e(BASE_URL); ?>/modulos/permisos.php">Permisos</a>
-   <a class="<?php echo $active==='reportes'?'active':''; ?>" href="<?php echo e(BASE_URL); ?>/modulos/reportes.php">Reportes</a>
-    <a class="<?php echo $active==='reposos'?'active':''; ?>" href="<?php echo e(BASE_URL); ?>/modulos/reposos.php">Reposos</a>
-    <a class="<?php echo $active==='personal'?'active':''; ?>" href="<?php echo e(BASE_URL); ?>/modulos/personal.php">Personal</a>
-  </div>
+<div class="container">
 
-  <div class="container">
+

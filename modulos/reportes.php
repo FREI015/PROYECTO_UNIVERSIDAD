@@ -1,6 +1,66 @@
 <?php
 require_once __DIR__ . "/../includes/config.php";
 require_once __DIR__ . "/../includes/funciones.php";
+
+// 24A1_GUARD_MODULO_SENSIBLE
+if (empty($_SESSION["user"]) && empty($_SESSION["usuario_id"]) && empty($_SESSION["usuario"])) {
+  go(BASE_URL . "/login.php?next=" . urlencode(BASE_URL . "/modulos/reportes.php"));
+}
+
+requirePermiso("ver_reportes", BASE_URL . "/modulos/asistencias.php");
+
+// 24A4_REPORTES_TURNO_SCOPE_INIT
+$turnosPermitidos = turnosPermitidosPorRol();
+$tieneAlcanceGlobal = tieneAlcanceGlobalTurnos();
+$turnoIdsPermitidos = [];
+
+function reportes24A4_empleadoPermitido(PDO $pdo, int $empleadoId): bool {
+  if (tieneAlcanceGlobalTurnos()) {
+    return true;
+  }
+
+  if ($empleadoId <= 0) {
+    return false;
+  }
+
+  static $cache = [];
+
+  if (array_key_exists($empleadoId, $cache)) {
+    return $cache[$empleadoId];
+  }
+
+  $stmtScope = $pdo->prepare("
+    SELECT t.nombre
+    FROM empleados e
+    LEFT JOIN turnos t ON t.id = e.turno_id
+    WHERE e.id = ?
+    LIMIT 1
+  ");
+  $stmtScope->execute([$empleadoId]);
+  $turnoNombre = (string)$stmtScope->fetchColumn();
+
+  $cache[$empleadoId] = puedeVerTurno($turnoNombre);
+  return $cache[$empleadoId];
+}
+
+function reportes24A4_filtrarEmpleados(PDO $pdo, array $empleados): array {
+  if (tieneAlcanceGlobalTurnos()) {
+    return $empleados;
+  }
+
+  $filtrados = [];
+
+  foreach ($empleados as $empleado) {
+    $empleadoId = (int)($empleado["id"] ?? 0);
+
+    if (reportes24A4_empleadoPermitido($pdo, $empleadoId)) {
+      $filtrados[] = $empleado;
+    }
+  }
+
+  return $filtrados;
+}
+
 requireLogin();
 require_once __DIR__ . "/../includes/conexion.php";
 
@@ -9,15 +69,33 @@ $active = "reportes";
 require_once __DIR__ . "/../includes/header.php";
 
 $hoy = date("Y-m-d");
-$turnos = $pdo->query("SELECT id, nombre FROM turnos ORDER BY id")->fetchAll(PDO::FETCH_ASSOC);
+// 24A4_REPORTES_TURNOS_FILTRADOS
+if ($tieneAlcanceGlobal) {
+  $turnos = $pdo->query("SELECT id, nombre FROM turnos ORDER BY id")->fetchAll(PDO::FETCH_ASSOC);
+} else {
+  if ($turnosPermitidos === []) {
+    $turnos = [];
+  } else {
+    $placeholdersTurnos = implode(",", array_fill(0, count($turnosPermitidos), "?"));
+    $stmtTurnos = $pdo->prepare("SELECT id, nombre FROM turnos WHERE UPPER(nombre) IN ($placeholdersTurnos) ORDER BY id");
+    $stmtTurnos->execute($turnosPermitidos);
+    $turnos = $stmtTurnos->fetchAll(PDO::FETCH_ASSOC);
+  }
 
-// ✅ Empleados para reporte individual
+  $turnoIdsPermitidos = array_map("intval", array_column($turnos, "id"));
+}
+
+// Empleados disponibles para reporte individual.
 $empleados = $pdo->query("
   SELECT e.id, CONCAT(e.nombres,' ',e.apellidos) AS nombre, e.cedula, c.nombre AS cargo
   FROM empleados e
   JOIN cargos c ON c.id = e.cargo_id
   ORDER BY e.apellidos, e.nombres
 ")->fetchAll(PDO::FETCH_ASSOC);
+// 24A4_REPORTES_FILTRAR_EMPLEADOS
+if (isset($empleados) && is_array($empleados)) {
+  $empleados = reportes24A4_filtrarEmpleados($pdo, $empleados);
+}
 
 function eopt($v){ return htmlspecialchars((string)$v, ENT_QUOTES, "UTF-8"); }
 ?>
@@ -51,7 +129,6 @@ function eopt($v){ return htmlspecialchars((string)$v, ENT_QUOTES, "UTF-8"); }
   <div class="h1">Módulo de Reportes (PDF)</div>
   <div class="sub">Exporta reportes de asistencia en formato PDF.</div>
 
-  <!-- ===== REPORTE GENERAL ===== -->
   <div class="section-title">Reporte General</div>
   <div class="section-sub">Genera reportes diarios, semanales, quincenales, mensuales y trimestrales con estadísticas de todos los empleados.</div>
 
@@ -67,11 +144,6 @@ function eopt($v){ return htmlspecialchars((string)$v, ENT_QUOTES, "UTF-8"); }
           <option value="TRIMESTRAL">Trimestral</option>
           <option value="PERSONALIZADO">Personalizado (desde/hasta)</option>
         </select>
-      </div>
-
-      <div>
-        <label style="font-weight:900;font-size:12px;color:#6b7280;">Fecha base</label>
-        <input class="input" type="date" name="fecha_base" value="<?php echo e($hoy); ?>">
       </div>
 
       <div>
@@ -102,12 +174,11 @@ function eopt($v){ return htmlspecialchars((string)$v, ENT_QUOTES, "UTF-8"); }
     <div class="note">
       <strong>Cómo se toma el rango:</strong><br>
       - Si colocas <em>Desde</em> y <em>Hasta</em>, se usa ese rango (ideal para "Personalizado").<br>
-      - Si no, el sistema calcula el rango según el <em>Periodo</em> y la <em>Fecha base</em>.<br>
+      - Si no colocas <em>Desde</em> y <em>Hasta</em>, el sistema calcula el rango segun el <em>Periodo</em> seleccionado.<br>
       - El estado diario sigue la prioridad: <strong>Reposo</strong> &gt; <strong>Permiso</strong> &gt; <strong>Retardo</strong> &gt; <strong>A tiempo</strong> &gt; <strong>Ausente</strong>.
     </div>
   </form>
 
-  <!-- ===== REPORTE INDIVIDUAL ===== -->
   <div class="section-divider">
     <div class="section-title">Reporte Individual por Empleado</div>
     <div class="section-sub">Genera un reporte PDF con toda la asistencia de un empleado específico.</div>
@@ -152,4 +223,126 @@ function eopt($v){ return htmlspecialchars((string)$v, ENT_QUOTES, "UTF-8"); }
 
 </div>
 
+<script>
+/* 25A2M1_REPORTES_DATE_VISUAL */
+(function(){
+  function formatDate(value){
+    if (!value || value.indexOf("-") === -1) return "";
+    var parts = value.split("-");
+    if (parts.length !== 3) return value;
+    return parts[2] + "/" + parts[1] + "/" + parts[0];
+  }
+
+  function openNativePicker(input){
+    try {
+      input.focus({ preventScroll:true });
+    } catch(e) {
+      input.focus();
+    }
+
+    try {
+      if (typeof input.showPicker === "function") {
+        input.showPicker();
+      } else {
+        input.click();
+      }
+    } catch(e) {
+      try { input.click(); } catch(ignore) {}
+    }
+  }
+
+  function bindReportDateInputs(){
+    var inputs = Array.prototype.slice.call(document.querySelectorAll("input[type='date']"));
+
+    inputs.forEach(function(input){
+      if (input.dataset.reportDateVisual === "1") return;
+
+      input.dataset.reportDateVisual = "1";
+      input.classList.add("report-native-date");
+
+      var currentParent = input.parentNode;
+      if (!currentParent) return;
+
+      var control = document.createElement("div");
+      control.className = "report-date-control";
+      control.setAttribute("role", "button");
+      control.setAttribute("tabindex", "0");
+
+      var value = document.createElement("span");
+      value.className = "report-date-value";
+
+      var icon = document.createElement("span");
+      icon.className = "report-date-icon";
+      icon.setAttribute("aria-hidden", "true");
+      icon.textContent = String.fromCharCode(9638);
+
+      currentParent.insertBefore(control, input);
+      control.appendChild(input);
+      control.appendChild(value);
+      control.appendChild(icon);
+
+      function sync(){
+        var text = formatDate(input.value);
+        value.textContent = text || "";
+        if (text) {
+          value.classList.remove("is-empty");
+        } else {
+          value.classList.add("is-empty");
+        }
+      }
+
+      control.addEventListener("click", function(){
+        openNativePicker(input);
+      });
+
+      control.addEventListener("keydown", function(event){
+        var key = event.key || "";
+        if (key === "Enter" || key === " ") {
+          event.preventDefault();
+          openNativePicker(input);
+        }
+      });
+
+      input.addEventListener("change", sync);
+      input.addEventListener("input", sync);
+
+      sync();
+    });
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", bindReportDateInputs);
+  } else {
+    bindReportDateInputs();
+  }
+})();
+</script>
+<script>
+/* 25A2M4_REPORTES_MARK_FORMS */
+(function(){
+  function mark(){
+    var forms = Array.prototype.slice.call(document.querySelectorAll("form"));
+
+    forms.forEach(function(form){
+      if (form.querySelector("select[name='periodo']")) {
+        form.classList.add("reports-period-form-clean");
+      }
+
+      if (form.querySelector("select[name*='empleado']")) {
+        form.classList.add("reports-individual-form-clean");
+      }
+
+      if (form.querySelector("input[type='date'], select[name='periodo'], select[name*='empleado'], select[name='turno']")) {
+        form.classList.add("reports-form-clean");
+      }
+    });
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", mark);
+  } else {
+    mark();
+  }
+})();
+</script>
 <?php require_once __DIR__ . "/../includes/footer.php"; ?>

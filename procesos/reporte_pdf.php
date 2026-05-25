@@ -3,6 +3,129 @@ require_once __DIR__ . "/../includes/config.php";
 require_once __DIR__ . "/../includes/funciones.php";
 requireLogin();
 require_once __DIR__ . "/../includes/conexion.php";
+// 24A5_REPORTE_PDF_SCOPE
+if (empty($_SESSION["user"]) && empty($_SESSION["usuario_id"]) && empty($_SESSION["usuario"])) {
+  go(BASE_URL . "/login.php?next=" . urlencode(BASE_URL . "/procesos/reporte_pdf.php"));
+}
+
+requirePermiso("ver_reportes", BASE_URL . "/modulos/reportes.php");
+
+function reportePdf24A5_paramEntero(array $keys): ?int {
+  foreach ($keys as $key) {
+    if (isset($_REQUEST[$key]) && trim((string)$_REQUEST[$key]) !== "") {
+      $valor = (int)$_REQUEST[$key];
+      return $valor > 0 ? $valor : null;
+    }
+  }
+
+  return null;
+}
+
+function reportePdf24A5_setParamTurno(int $turnoId): void {
+  foreach (["turno_id", "turno", "turnoId"] as $key) {
+    $_GET[$key] = (string)$turnoId;
+    $_POST[$key] = (string)$turnoId;
+    $_REQUEST[$key] = (string)$turnoId;
+  }
+}
+
+function reportePdf24A5_turnoNombrePorId(PDO $pdo, int $turnoId): string {
+  if ($turnoId <= 0) {
+    return "";
+  }
+
+  $stmt = $pdo->prepare("SELECT nombre FROM turnos WHERE id = ? LIMIT 1");
+  $stmt->execute([$turnoId]);
+
+  return strtoupper(trim((string)$stmt->fetchColumn()));
+}
+
+function reportePdf24A5_turnoIdPermitido(PDO $pdo, int $turnoId): bool {
+  if (tieneAlcanceGlobalTurnos()) {
+    return true;
+  }
+
+  $turnoNombre = reportePdf24A5_turnoNombrePorId($pdo, $turnoId);
+
+  return puedeVerTurno($turnoNombre);
+}
+
+function reportePdf24A5_empleadoPermitido(PDO $pdo, int $empleadoId): bool {
+  if (tieneAlcanceGlobalTurnos()) {
+    return true;
+  }
+
+  if ($empleadoId <= 0) {
+    return false;
+  }
+
+  $stmt = $pdo->prepare("
+    SELECT t.nombre
+    FROM empleados e
+    LEFT JOIN turnos t ON t.id = e.turno_id
+    WHERE e.id = ?
+    LIMIT 1
+  ");
+  $stmt->execute([$empleadoId]);
+  $turnoNombre = (string)$stmt->fetchColumn();
+
+  return puedeVerTurno($turnoNombre);
+}
+
+function reportePdf24A5_primerTurnoPermitidoId(PDO $pdo): ?int {
+  if (tieneAlcanceGlobalTurnos()) {
+    return null;
+  }
+
+  $turnos = turnosPermitidosPorRol();
+
+  if ($turnos === []) {
+    return null;
+  }
+
+  $placeholders = implode(",", array_fill(0, count($turnos), "?"));
+  $stmt = $pdo->prepare("SELECT id FROM turnos WHERE UPPER(nombre) IN ($placeholders) ORDER BY id LIMIT 1");
+  $stmt->execute($turnos);
+
+  $turnoId = (int)$stmt->fetchColumn();
+
+  return $turnoId > 0 ? $turnoId : null;
+}
+
+function reportePdf24A5_denegar(string $mensaje): void {
+  header("Location: " . BASE_URL . "/modulos/reportes.php?err=" . urlencode($mensaje));
+  exit;
+}
+
+function reportePdf24A5_aplicarAlcance(PDO $pdo): void {
+  if (tieneAlcanceGlobalTurnos()) {
+    return;
+  }
+
+  $empleadoId = reportePdf24A5_paramEntero(["empleado_id", "empleado", "empleadoId"]);
+  $turnoId = reportePdf24A5_paramEntero(["turno_id", "turno", "turnoId"]);
+
+  if ($empleadoId !== null && !reportePdf24A5_empleadoPermitido($pdo, $empleadoId)) {
+    reportePdf24A5_denegar("No tienes permiso para generar reporte de ese empleado.");
+  }
+
+  if ($turnoId !== null && !reportePdf24A5_turnoIdPermitido($pdo, $turnoId)) {
+    reportePdf24A5_denegar("No tienes permiso para generar reporte de ese turno.");
+  }
+
+  if ($empleadoId === null && $turnoId === null) {
+    $turnoPermitidoId = reportePdf24A5_primerTurnoPermitidoId($pdo);
+
+    if ($turnoPermitidoId === null) {
+      reportePdf24A5_denegar("No tienes turnos disponibles para generar reportes.");
+    }
+
+    reportePdf24A5_setParamTurno($turnoPermitidoId);
+  }
+}
+
+reportePdf24A5_aplicarAlcance($pdo);
+
 
 date_default_timezone_set("America/Caracas");
 
@@ -12,15 +135,18 @@ date_default_timezone_set("America/Caracas");
  */
 require_once __DIR__ . "/../libs/tcpdf/tcpdf.php";
 
-/* =========================
-   Helpers
-   ========================= */
+// Helpers
 function clampDate($d, $fallback) {
   $d = trim((string)$d);
   if ($d === "") return $fallback;
   if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $d)) return $fallback;
   return $d;
 }
+
+function pdfEsc($value): string {
+  return htmlspecialchars((string)$value, ENT_QUOTES, "UTF-8");
+}
+
 
 function rangeFromPeriodo(string $periodo, string $fechaBase): array {
   $dt = new DateTime($fechaBase);
@@ -107,9 +233,7 @@ function dateListInclusive(string $desde, string $hasta): array {
   return $out;
 }
 
-/* =========================
-   Inputs
-   ========================= */
+// Inputs
 $periodo    = strtoupper(trim($_GET["periodo"] ?? "DIARIO"));
 $fechaBase  = clampDate($_GET["fecha_base"] ?? "", date("Y-m-d"));
 $turnoIdRaw = trim($_GET["turno_id"] ?? "");
@@ -118,7 +242,7 @@ $empleadoId = (int)($_GET["empleado_id"] ?? 0);
 $desdeIn = trim($_GET["desde"] ?? "");
 $hastaIn = trim($_GET["hasta"] ?? "");
 
-// ✅ Modo INDIVIDUAL: reporte de un solo empleado
+// Reporte individual de un empleado.
 $esIndividual = ($periodo === "INDIVIDUAL" && $empleadoId > 0);
 
 // Si el usuario pone desde/hasta, usamos ese rango; si no, calculamos por periodo/fecha_base.
@@ -141,11 +265,9 @@ if ($desdeIn !== "" && $hastaIn !== "" && preg_match('/^\d{4}-\d{2}-\d{2}$/', $d
 $turnoId = ($turnoIdRaw === "") ? null : (int)$turnoIdRaw;
 $dates = dateListInclusive($desde, $hasta);
 
-/* =========================
-   1) Empleados
-   ========================= */
+// 1) Empleados
 
-// ✅ Si es individual, buscar solo ese empleado
+// Busca solo el empleado solicitado para reporte individual.
 if ($esIndividual) {
   $sqlEmp = "
     SELECT e.id, e.cedula, e.nombres, e.apellidos, e.estado,
@@ -160,7 +282,7 @@ if ($esIndividual) {
   $stmt->execute([$empleadoId]);
   $empleados = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } else {
-  // Reporte general: todos los activos
+  // Reporte general de empleados activos.
   $sqlEmp = "
     SELECT e.id, e.cedula, e.nombres, e.apellidos, e.estado,
            c.nombre AS cargo,
@@ -199,9 +321,7 @@ if (!$empleados) {
 $empIds = array_map(fn($r)=> (int)$r["id"], $empleados);
 $placeholders = implode(",", array_fill(0, count($empIds), "?"));
 
-/* =========================
-   2) Data en bloque
-   ========================= */
+// 2) Data en bloque
 // asistencias en rango
 $sqlAsis = "
   SELECT empleado_id, fecha, estado, minutos_tarde
@@ -239,10 +359,6 @@ $stmt = $pdo->prepare($sqlRepo);
 $stmt->execute(array_merge([$desde, $hasta], $empIds));
 $repoRows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-/* =========================
-   3) Mapa empleado/fecha
-   Prioridad: REPOSO > PERMISO > ASISTENCIA(FALTA/RETARDO/ASISTIO) > AUSENTE
-   ========================= */
 $statusMap = [];
 foreach ($empIds as $id) {
   $statusMap[$id] = [];
@@ -340,9 +456,7 @@ foreach ($asisRows as $a) {
   }
 }
 
-/* =========================
-   4) Estadísticas
-   ========================= */
+// 4) Estadísticas
 $sumGlobal = [
   'empleados' => count($empleados),
   'dias' => count($dates),
@@ -428,9 +542,7 @@ if ($detalleExcedido) {
   $incidencias = array_slice($incidencias, 0, $maxDetalle);
 }
 
-/* =========================
-   5) Crear PDF
-   ========================= */
+// 5) Crear PDF
 $pdf = new TCPDF("P", "mm", "A4", true, "UTF-8", false);
 $pdf->SetCreator("Control de Asistencia");
 $pdf->SetAuthor("Sistema Control de Asistencia");
@@ -443,7 +555,7 @@ $pdf->SetFont("helvetica", "", 10);
 $generado = date("Y-m-d H:i");
 $turnoTxt = ($turnoId === null) ? "Todos" : ("Turno ID: " . $turnoId);
 
-// ✅ Título y nombre de archivo para reporte individual
+// Título y nombre del archivo para reporte individual.
 $tituloReporte = "Reporte de Asistencia - " . $label;
 $filename = "reporte_{$desde}_{$hasta}.pdf";
 
@@ -492,12 +604,12 @@ $html = '
 
 ';
 
-// ✅ Si es individual, mostrar info del empleado en lugar de tabla resumen
+// En reporte individual se muestra la ficha del empleado.
 if ($esIndividual && count($empleados) > 0) {
   $empInfo = $empleados[0];
-  $empNombreCompleto = htmlspecialchars(trim($empInfo["nombres"] . " " . $empInfo["apellidos"]), ENT_QUOTES, "UTF-8");
-  $empCargo = htmlspecialchars($empInfo["cargo"], ENT_QUOTES, "UTF-8");
-  $empTurno = htmlspecialchars($empInfo["turno"] ?? "—", ENT_QUOTES, "UTF-8");
+  $empNombreCompleto = pdfEsc(trim($empInfo["nombres"] . " " . $empInfo["apellidos"]));
+  $empCargo = pdfEsc($empInfo["cargo"]);
+  $empTurno = pdfEsc($empInfo["turno"] ?? "—");
   
   $html .= '
 <div class="box">
@@ -538,9 +650,9 @@ if ($esIndividual && count($empleados) > 0) {
 
   foreach ($resumen as $r) {
     $html .= '<tr>
-      <td>'.htmlspecialchars(formatCedula($r["cedula"]), ENT_QUOTES, "UTF-8").'</td>
-      <td>'.htmlspecialchars($r["empleado"], ENT_QUOTES, "UTF-8").'</td>
-      <td>'.htmlspecialchars($r["turno"], ENT_QUOTES, "UTF-8").'</td>
+      <td>'.pdfEsc(formatCedula($r["cedula"])).'</td>
+      <td>'.pdfEsc($r["empleado"]).'</td>
+      <td>'.pdfEsc($r["turno"]).'</td>
       <td>'.$r["asistio"].'</td>
       <td>'.$r["a_tiempo"].'</td>
       <td>'.$r["retardo"].'</td>
@@ -568,12 +680,12 @@ $html .= '<table>
 
 foreach ($incidencias as $i) {
   $html .= '<tr>
-    <td>'.htmlspecialchars($i["fecha"], ENT_QUOTES, "UTF-8").'</td>
-    <td>'.htmlspecialchars(formatCedula($i["cedula"]), ENT_QUOTES, "UTF-8").'</td>
-    <td>'.htmlspecialchars($i["empleado"], ENT_QUOTES, "UTF-8").'</td>
-    <td>'.htmlspecialchars($i["turno"], ENT_QUOTES, "UTF-8").'</td>
-    <td>'.htmlspecialchars($i["estado"], ENT_QUOTES, "UTF-8").'</td>
-    <td>'.htmlspecialchars($i["detalle"], ENT_QUOTES, "UTF-8").'</td>
+    <td>'.pdfEsc($i["fecha"]).'</td>
+    <td>'.pdfEsc(formatCedula($i["cedula"])).'</td>
+    <td>'.pdfEsc($i["empleado"]).'</td>
+    <td>'.pdfEsc($i["turno"]).'</td>
+    <td>'.pdfEsc($i["estado"]).'</td>
+    <td>'.pdfEsc($i["detalle"]).'</td>
   </tr>';
 }
 

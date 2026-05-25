@@ -1,6 +1,62 @@
 <?php
 require_once __DIR__ . "/../includes/config.php";
 require_once __DIR__ . "/../includes/funciones.php";
+
+// 24A1_GUARD_MODULO_SENSIBLE
+if (empty($_SESSION["user"]) && empty($_SESSION["usuario_id"]) && empty($_SESSION["usuario"])) {
+  go(BASE_URL . "/login.php?next=" . urlencode(BASE_URL . "/modulos/permisos.php"));
+}
+
+requirePermiso("ver_permisos", BASE_URL . "/modulos/asistencias.php");
+// permisos24A3_TURNO_HELPERS
+function permisos24A3_empleadoPermitido(PDO $pdo, int $empleadoId): bool {
+  if (tieneAlcanceGlobalTurnos()) {
+    return true;
+  }
+
+  if ($empleadoId <= 0) {
+    return false;
+  }
+
+  static $cache = [];
+
+  if (array_key_exists($empleadoId, $cache)) {
+    return $cache[$empleadoId];
+  }
+
+  $stmtScope = $pdo->prepare("
+    SELECT t.nombre
+    FROM empleados e
+    LEFT JOIN turnos t ON t.id = e.turno_id
+    WHERE e.id = ?
+    LIMIT 1
+  ");
+  $stmtScope->execute([$empleadoId]);
+  $turnoNombre = (string)$stmtScope->fetchColumn();
+
+  $cache[$empleadoId] = puedeVerTurno($turnoNombre);
+  return $cache[$empleadoId];
+}
+
+function permisos24A3_filtrarPorTurno(PDO $pdo, array $filas, string $idKey): array {
+  if (tieneAlcanceGlobalTurnos()) {
+    return $filas;
+  }
+
+  $filtradas = [];
+
+  foreach ($filas as $fila) {
+    $empleadoId = (int)($fila[$idKey] ?? 0);
+
+    if (permisos24A3_empleadoPermitido($pdo, $empleadoId)) {
+      $filtradas[] = $fila;
+    }
+  }
+
+  return $filtradas;
+}
+
+
 require_once __DIR__ . "/../includes/conexion.php";
 
 requireLogin();
@@ -11,22 +67,49 @@ $pagina = max(1, (int)($_GET["pagina"] ?? 1));
 $porPagina = 10;
 $offset = ($pagina - 1) * $porPagina;
 
+// 24B1_PERMISOS_SQL_REAL
+$turnoWhereSql = "";
+$turnoParams = [];
+
+if (!tieneAlcanceGlobalTurnos()) {
+  $turnoWhereSql = filtroTurnosPermitidosSql("t", $turnoParams);
+
+  if (trim($turnoWhereSql) === "") {
+    $turnoWhereSql = " AND 1 = 0 ";
+  }
+}
+
+$whereSql = trim($turnoWhereSql) !== "" ? (" WHERE 1 = 1 " . $turnoWhereSql) : "";
+
 // Empleados para el select
-$empleados = $pdo->query("
+$sqlEmpleados = "
   SELECT e.id, CONCAT(e.nombres,' ',e.apellidos) AS nombre, e.cedula, c.nombre AS cargo
   FROM empleados e
   JOIN cargos c ON c.id = e.cargo_id
+  LEFT JOIN turnos t ON t.id = e.turno_id
+  $whereSql
   ORDER BY e.apellidos, e.nombres
-")->fetchAll(PDO::FETCH_ASSOC);
+";
+$stmtEmpleados = $pdo->prepare($sqlEmpleados);
+$stmtEmpleados->execute($turnoParams);
+$empleados = $stmtEmpleados->fetchAll(PDO::FETCH_ASSOC);
 
-// Lista permisos con paginación
-$stmtTotal = $pdo->query("SELECT COUNT(*) AS total FROM permisos");
+// Lista permisos con paginacion
+$sqlTotal = "
+  SELECT COUNT(*) AS total
+  FROM permisos p
+  JOIN empleados e ON e.id = p.empleado_id
+  LEFT JOIN turnos t ON t.id = e.turno_id
+  $whereSql
+";
+$stmtTotal = $pdo->prepare($sqlTotal);
+$stmtTotal->execute($turnoParams);
 $totalPermisos = (int)($stmtTotal->fetch(PDO::FETCH_ASSOC)["total"] ?? 0);
-$totalPaginas = ceil($totalPermisos / $porPagina);
+$totalPaginas = (int)ceil($totalPermisos / $porPagina);
 
-$permisos = $pdo->query("
+$sqlPermisos = "
   SELECT
-    p.id, p.tipo, p.fecha_inicio, p.fecha_fin, p.motivo, p.observaciones, p.estado, p.creado_en,
+    p.id, p.empleado_id, p.tipo, p.fecha_inicio, p.fecha_fin, p.motivo, p.observaciones, p.estado, p.creado_en,
     CONCAT(e.nombres,' ',e.apellidos) AS empleado,
     e.cedula,
     c.nombre AS cargo,
@@ -34,12 +117,22 @@ $permisos = $pdo->query("
   FROM permisos p
   JOIN empleados e ON e.id = p.empleado_id
   JOIN cargos c ON c.id = e.cargo_id
+  LEFT JOIN turnos t ON t.id = e.turno_id
   LEFT JOIN usuarios u ON u.id = p.creado_por
+  $whereSql
   ORDER BY p.id DESC
   LIMIT $porPagina OFFSET $offset
-")->fetchAll(PDO::FETCH_ASSOC);
+";
+$stmtPermisos = $pdo->prepare($sqlPermisos);
+$stmtPermisos->execute($turnoParams);
+$permisos = $stmtPermisos->fetchAll(PDO::FETCH_ASSOC);
 
-$mostrandoInicio = $offset + 1;
+// Defensa secundaria: conserva filtro PHP por si cambia el SQL.
+if (isset($permisos) && is_array($permisos)) {
+  $permisos = permisos24A3_filtrarPorTurno($pdo, $permisos, "empleado_id");
+}
+
+$mostrandoInicio = $totalPermisos > 0 ? $offset + 1 : 0;
 $mostrandoFin = min($offset + $porPagina, $totalPermisos);
 
 $pageTitle = "Permisos";
@@ -48,7 +141,7 @@ require_once __DIR__ . "/../includes/header.php";
 ?>
 
 <style>
-  /* ===== Permisos: más limpio, menos negrita y más angosto ===== */
+
   .perm-wrap{
     max-width: 980px;
     margin: 0 auto;
@@ -68,18 +161,16 @@ require_once __DIR__ . "/../includes/header.php";
     margin: 0 0 14px 0;
     color:#6c757d;
     font-size: 13px;
-    font-weight: 600; /* menos negrita */
+    font-weight: 600;
     line-height: 1.35;
   }
-
-  /* Form “más angosto” centrado */
   .perm-form{
     background:#fff;
     border:1px solid #e9edf4;
     border-radius:14px;
     padding:14px;
-    max-width: 860px;       /* ✅ angosto */
-    margin: 0 auto;         /* ✅ centrado */
+    max-width: 860px;
+    margin: 0 auto;
   }
 
   .grid{
@@ -92,7 +183,7 @@ require_once __DIR__ . "/../includes/header.php";
   .field label{
     display:block;
     font-size:12px;
-    font-weight: 650; /* ✅ menos negrita */
+    font-weight: 650;
     margin:0 0 6px;
     color:#111827;
   }
@@ -104,7 +195,7 @@ require_once __DIR__ . "/../includes/header.php";
     border-radius:12px;
     outline:none;
     background:#fff;
-    font-weight: 600; /* ✅ menos negrita */
+    font-weight: 600;
     color:#111827;
   }
 
@@ -135,7 +226,7 @@ require_once __DIR__ . "/../includes/header.php";
     padding:10px 14px;
     border-radius:12px;
     cursor:pointer;
-    font-weight: 750; /* menos negrita */
+    font-weight: 750;
     box-shadow: 0 2px 10px rgba(15,23,42,.06);
   }
   .btn-primary:hover{filter:brightness(.98)}
@@ -146,7 +237,7 @@ require_once __DIR__ . "/../includes/header.php";
     padding:10px 14px;
     border-radius:12px;
     cursor:pointer;
-    font-weight: 700; /* menos negrita */
+    font-weight: 700;
     text-decoration:none;
     display:inline-flex;
     align-items:center;
@@ -178,8 +269,6 @@ require_once __DIR__ . "/../includes/header.php";
     font-size: 13px;
     font-weight: 600;
   }
-
-  /* Ajuste de tabla (menos negrita en encabezado) */
   table th{
     font-weight: 700 !important;
     font-size: 12px;
@@ -212,7 +301,8 @@ require_once __DIR__ . "/../includes/header.php";
     <?php if ($err): ?><div class="alert bad"><?php echo e($err); ?></div><?php endif; ?>
 
     <div class="perm-form">
-      <form method="POST" action="../procesos/permiso_guardar.php" id="formPermiso">
+      <form class="permissions-form-modern" method="POST" action="../procesos/permiso_guardar.php" id="formPermiso">
+    <?php echo csrfInput(); ?>
         <div class="grid">
           <!-- Empleado -->
           <div class="field span2">
@@ -270,7 +360,7 @@ require_once __DIR__ . "/../includes/header.php";
     <div class="table-title">Permisos Registrados</div>
     <p class="table-sub">Últimos 50 registros.</p>
 
-    <table>
+    <table class="permissions-table-modern">
       <thead>
         <tr>
           <th>Empleado</th>
@@ -327,7 +417,7 @@ require_once __DIR__ . "/../includes/header.php";
 </div>
 
 <script>
-  // ✅ Coherencia de fechas (desde <= hasta)
+  // Valida que la fecha final no sea menor que la inicial.
   (function(){
     const desde = document.getElementById('fecha_inicio');
     const hasta = document.getElementById('fecha_fin');
@@ -345,7 +435,7 @@ require_once __DIR__ . "/../includes/header.php";
     sync();
   })();
 
-  // ✅ Validaciones: Solo letras para Tipo y Motivo
+  // Limita tipo y motivo a caracteres alfabéticos.
   (function(){
     const tipoInput = document.querySelector('input[name="tipo"]');
     const motivoInput = document.querySelector('input[name="motivo"]');
@@ -362,4 +452,94 @@ require_once __DIR__ . "/../includes/header.php";
   })();
 </script>
 
+<script>
+/* 25A2K5_PERMISOS_DATE_VISUAL */
+(function(){
+  function formatDate(value){
+    if (!value || value.indexOf("-") === -1) return "";
+    var parts = value.split("-");
+    if (parts.length !== 3) return value;
+    return parts[2] + "/" + parts[1] + "/" + parts[0];
+  }
+
+  function openNativePicker(input){
+    try {
+      input.focus({ preventScroll:true });
+    } catch(e) {
+      input.focus();
+    }
+
+    try {
+      if (typeof input.showPicker === "function") {
+        input.showPicker();
+      }
+    } catch(e) {}
+  }
+
+  function bindPermissionDates(){
+    var inputs = Array.prototype.slice.call(document.querySelectorAll("#formPermiso input[type='date']"));
+
+    inputs.forEach(function(input){
+      if (input.dataset.permissionDateVisual === "1") return;
+
+      input.dataset.permissionDateVisual = "1";
+      input.classList.add("permission-native-date");
+
+      var currentParent = input.parentNode;
+      if (!currentParent) return;
+
+      var control = document.createElement("div");
+      control.className = "permission-date-control";
+      control.setAttribute("role", "button");
+      control.setAttribute("tabindex", "0");
+
+      var value = document.createElement("span");
+      value.className = "permission-date-value";
+
+      var icon = document.createElement("span");
+      icon.className = "permission-date-icon";
+      icon.setAttribute("aria-hidden", "true");
+      icon.textContent = String.fromCharCode(9638);
+
+      currentParent.insertBefore(control, input);
+      control.appendChild(input);
+      control.appendChild(value);
+      control.appendChild(icon);
+
+      function sync(){
+        var text = formatDate(input.value);
+        value.textContent = text || "";
+        if (text) {
+          value.classList.remove("is-empty");
+        } else {
+          value.classList.add("is-empty");
+        }
+      }
+
+      control.addEventListener("click", function(){
+        openNativePicker(input);
+      });
+
+      control.addEventListener("keydown", function(event){
+        var key = event.key || "";
+        if (key === "Enter" || key === " ") {
+          event.preventDefault();
+          openNativePicker(input);
+        }
+      });
+
+      input.addEventListener("change", sync);
+      input.addEventListener("input", sync);
+
+      sync();
+    });
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", bindPermissionDates);
+  } else {
+    bindPermissionDates();
+  }
+})();
+</script>
 <?php require_once __DIR__ . "/../includes/footer.php"; ?>

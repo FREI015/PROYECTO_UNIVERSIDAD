@@ -36,5 +36,9 @@ define("BASE_ORIGIN", $origin);  // ej: http://localhost
 
 // Definir la constante para la tolerancia de minutos en los retrasos
 if (!defined('RETARDO_TOLERANCIA_MINUTOS')) {
-  define('RETARDO_TOLERANCIA_MINUTOS', 15); // 15 minutos de tolerancia para retrasos
+  define('RETARDO_TOLERANCIA_MINUTOS', 5); // 5 minutos de tolerancia para retrasos
+}
+
+if (!defined('ASISTENCIA_MARGEN_ANTES_MINUTOS')) {
+    define('ASISTENCIA_MARGEN_ANTES_MINUTOS', 5);
 }

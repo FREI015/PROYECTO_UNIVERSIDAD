@@ -11,6 +11,8 @@ if ($_SERVER["REQUEST_METHOD"] !== "POST") {
   go(BASE_URL . "/modulos/asistencias.php?err=" . urlencode("Acceso inválido"));
 }
 
+verifyCsrfOrRedirect(BASE_URL . "/modulos/asistencias.php?err=" . urlencode("Solicitud inválida. Intenta nuevamente."));
+
 // Verificar acción: activar o desactivar
 $accion = trim($_POST["accion"] ?? "");
 
@@ -50,10 +52,16 @@ if ($accion === "activar") {
   }
 
   // Comparar clave (sin hash, igual que login_procesar.php)
-  $stored = (string)($user["clave"] ?? "");
-  if ($stored !== $clave) {
-    go(BASE_URL . "/modulos/asistencias.php?err=" . urlencode("Credenciales de administrador inválidas"));
-  }
+$stored = (string)($user["clave"] ?? "");
+if (!verificarClaveUsuario($clave, $stored)) {
+  go(BASE_URL . "/modulos/asistencias.php?err=" . urlencode("Credenciales inválidas"));
+}
+
+if (claveNecesitaRehash($stored)) {
+  $nuevoHash = crearHashClaveUsuario($clave);
+  $updClave = $pdo->prepare("UPDATE usuarios SET clave=? WHERE id=? LIMIT 1");
+  $updClave->execute([$nuevoHash, (int)$user["id"]]);
+}
 
   // Activar modo emergencia
   $_SESSION['modo_emergencia'] = true;

@@ -10,7 +10,29 @@ if ($_SERVER["REQUEST_METHOD"] !== "POST") {
   exit;
 }
 
+verifyCsrfOrRedirect(BASE_URL . "/modulos/personal.php?err=" . urlencode("Solicitud inválida. Intenta nuevamente."));
+// 24A2_PERSONAL_ESTADO_PERMISO
+requirePermiso("ver_personal", BASE_URL . "/modulos/personal.php");
+
 $id = (int)($_POST["id"] ?? 0);
+// 24A2_PERSONAL_ESTADO_TURNO_SCOPE
+$empleadoScopeId = isset($empleado_id) ? (int)$empleado_id : (int)$id;
+if ($empleadoScopeId > 0) {
+  $stmtEmpScope = $pdo->prepare("
+    SELECT t.nombre
+    FROM empleados e
+    LEFT JOIN turnos t ON t.id = e.turno_id
+    WHERE e.id = ?
+    LIMIT 1
+  ");
+  $stmtEmpScope->execute([$empleadoScopeId]);
+  $turnoNombreScope = (string)$stmtEmpScope->fetchColumn();
+
+  if (!puedeVerTurno($turnoNombreScope)) {
+    header("Location: " . BASE_URL . "/modulos/personal.php?err=" . urlencode("No tienes permiso para modificar personal de ese turno."));
+    exit;
+  }
+}
 $accion = trim((string)($_POST["accion"] ?? ""));
 
 // (Opcional) condición de baja si existe en tu BD
@@ -59,7 +81,7 @@ try {
       // Si tu tabla no tiene esas columnas, no rompemos el sistema.
     }
 
-    // ✅ Propagación: si lo retiras, ANULA permisos/reposos activos (alineado a ENUM)
+    // Anula permisos y reposos activos al retirar el empleado.
     $pdo->prepare("UPDATE permisos SET estado='ANULADO' WHERE empleado_id=? AND estado='ACTIVO'")
         ->execute([$id]);
 
@@ -75,7 +97,7 @@ try {
 
 } catch (Throwable $e) {
   if ($pdo->inTransaction()) $pdo->rollBack();
-  header("Location: " . BASE_URL . "/modulos/personal.php?err=" . urlencode("Error: " . $e->getMessage()));
+  header("Location: " . BASE_URL . "/modulos/personal.php?err=" . urlencode("No se pudo actualizar el estado del empleado."));
   exit;
 }
 ?>

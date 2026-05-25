@@ -22,7 +22,7 @@ $stmt->execute([$usuario]);
 $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$user) {
-  go(BASE_URL . "/login.php?err=" . urlencode("ADSCESO DENEGADO") . "&next=" . urlencode($next));
+  go(BASE_URL . "/login.php?err=" . urlencode("ACCESO DENEGADO") . "&next=" . urlencode($next));
 }
 
 $estado = strtoupper(trim((string)($user["estado"] ?? "")));
@@ -31,8 +31,9 @@ if ($estado !== "ACTIVO") {
 }
 
 $stored = (string)($user["clave"] ?? "");
-if ($stored !== $clave) {
-  go(BASE_URL . "/login.php?err=" . urlencode("ADSCESO DENEGADO") . "&next=" . urlencode($next));
+
+if (!password_verify($clave, $stored)) {
+  go(BASE_URL . "/login.php?err=" . urlencode("ACCESO DENEGADO") . "&next=" . urlencode($next));
 }
 
 session_regenerate_id(true);
@@ -45,5 +46,6 @@ $_SESSION["user"] = [
 
 $_SESSION["usuario_id"] = (int)$user["id"];
 $_SESSION["usuario"]    = (string)$user["usuario"];
+$_SESSION["rol"]        = (string)($user["rol"] ?? "");
 
 go($next);
