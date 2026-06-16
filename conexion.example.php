@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // conexion.example.php
 // Copia este archivo como includes/conexion.php y ajusta tus credenciales locales.
 

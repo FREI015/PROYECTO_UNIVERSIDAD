@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // includes/funciones.php
 require_once __DIR__ . "/config.php";
 

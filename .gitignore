@@ -1,4 +1,4 @@
-ï»¿.DS_Store
+.DS_Store
 Thumbs.db
 *.log
 *.tmp
@@ -6,3 +6,72 @@ Thumbs.db
 *.bak
 *.old
 .env
+
+# ---- Reglas seguras añadidas automáticamente ----
+
+
+# Sistema
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# VS Code
+.vscode/*
+!.vscode/extensions.json
+*.code-workspace
+
+# Logs
+*.log
+logs/
+
+# Variables de entorno / secretos
+.env
+.env.*
+!.env.example
+
+# Archivos sensibles comunes
+config.php
+conexion.php
+database.php
+db.php
+credentials.json
+secrets.json
+*.key
+*.pem
+*.p12
+*.pfx
+
+# Backups
+*.bak
+*.backup
+*.old
+*.tmp
+*.temp
+
+# Dependencias
+node_modules/
+vendor/
+
+# Builds
+dist/
+build/
+out/
+.cache/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Bases de datos locales
+*.sqlite
+*.sqlite3
+*.db
+*.sql
+
+# Comprimidos
+*.zip
+*.rar
+*.7z
+

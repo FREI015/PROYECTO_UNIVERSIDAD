@@ -1,4 +1,24 @@
-﻿<?php
+
+<?php
+ob_start();
+
+function limpiarSalidaAntesPdf(string $debugFile): void {
+  $salida = "";
+
+  while (ob_get_level() > 0) {
+    $contenido = ob_get_contents();
+
+    if ($contenido !== false && $contenido !== "") {
+      $salida .= $contenido;
+    }
+
+    @ob_end_clean();
+  }
+
+  if ($salida !== "") {
+    @file_put_contents($debugFile, $salida);
+  }
+}
 require_once __DIR__ . "/../includes/config.php";
 require_once __DIR__ . "/../includes/funciones.php";
 requireLogin();
@@ -603,7 +623,7 @@ if ($esIndividual && count($empleados) > 0) {
   $empNombreCompleto = pdfEsc(trim($empInfo["nombres"] . " " . $empInfo["apellidos"]));
   $empCargo = pdfEsc($empInfo["cargo"]);
   $empTurno = pdfEsc($empInfo["turno"] ?? "—");
-  
+
   $html .= '
 <div class="box">
   <strong>Empleado:</strong> '.$empNombreCompleto.'<br>
@@ -613,7 +633,7 @@ if ($esIndividual && count($empleados) > 0) {
 
 <h2>Resumen de asistencia</h2>
 ';
-  
+
   if (count($resumen) > 0) {
     $r = $resumen[0];
     $html .= '<div class="box">
@@ -685,6 +705,13 @@ foreach ($incidencias as $i) {
 $html .= '</table>';
 
 $pdf->writeHTML($html, true, false, true, false, '');
+
+$debugSalidaPdf = __DIR__ . "/../_fixes/salida_detectada_antes_pdf.txt";
+limpiarSalidaAntesPdf($debugSalidaPdf);
+
+if (headers_sent($archivoHeaders, $lineaHeaders)) {
+  die("No se pudo generar el PDF porque ya se enviaron encabezados en: " . $archivoHeaders . " línea " . $lineaHeaders);
+}
 
 $pdf->Output($filename, "I");
 exit;
