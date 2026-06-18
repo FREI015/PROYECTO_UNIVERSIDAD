@@ -65,19 +65,10 @@ try {
   if ($accion === "suspender") $nuevo = "SUSPENDIDO";
   if ($accion === "retirar")   $nuevo = "RETIRADO";
 
-  // Actualizar empleado (con condición si la columna existe)
-  // Para evitar error si NO existe la columna, hacemos update simple y luego intentamos el extra.
-  $upd = $pdo->prepare("UPDATE empleados SET estado=? WHERE id=?");
-  $upd->execute([$nuevo, $id]);
-
+  // MB5C: actualizar estado limpio usando columnas reales de baja.
   if ($accion === "retirar") {
-    // Si existen las columnas, las llenamos (si no existen, lo ignoramos)
-    try {
-      $upd2 = $pdo->prepare("UPDATE empleados SET condicion_baja=?, fecha_baja=CURDATE() WHERE id=?");
-      $upd2->execute([$condicion !== "" ? $condicion : null, $id]);
-    } catch (Throwable $e) {
-      // Si tu tabla no tiene esas columnas, no rompemos el sistema.
-    }
+    $upd = $pdo->prepare("UPDATE empleados SET estado=?, condicion_baja=?, fecha_baja=CURDATE() WHERE id=?");
+    $upd->execute([$nuevo, $condicion !== "" ? $condicion : null, $id]);
 
     // Anula permisos y reposos activos al retirar el empleado.
     $pdo->prepare("UPDATE permisos SET estado='ANULADO' WHERE empleado_id=? AND estado='ACTIVO'")
@@ -85,6 +76,9 @@ try {
 
     $pdo->prepare("UPDATE reposos SET estado='ANULADO' WHERE empleado_id=? AND estado='ACTIVO'")
         ->execute([$id]);
+  } else {
+    $upd = $pdo->prepare("UPDATE empleados SET estado=?, condicion_baja=NULL, fecha_baja=NULL WHERE id=?");
+    $upd->execute([$nuevo, $id]);
   }
 
   $pdo->commit();

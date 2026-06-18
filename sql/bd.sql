@@ -27,7 +27,11 @@ CREATE TABLE IF NOT EXISTS empleados (
   cargo_id INT NOT NULL,
   tipo_contrato ENUM('HORA','TURNO') NOT NULL DEFAULT 'TURNO',
   turno_id INT NULL,
+  jerarquia INT NOT NULL DEFAULT 999,
+  foto_archivo VARCHAR(255) NULL,
   estado ENUM('ACTIVO','SUSPENDIDO','RETIRADO') NOT NULL DEFAULT 'ACTIVO',
+  condicion_baja VARCHAR(120) NULL,
+  fecha_baja DATE NULL,
   creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_empleado_cargo FOREIGN KEY (cargo_id) REFERENCES cargos(id),
   CONSTRAINT fk_empleado_turno FOREIGN KEY (turno_id) REFERENCES turnos(id)

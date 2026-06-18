@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . "/../includes/config.php";
 require_once __DIR__ . "/../includes/funciones.php";
+requireLogin();
 requirePermiso("ver_reposos", BASE_URL . "/index.php");
 function reposoEmpleadoPermitido(PDO $pdo, int $empleadoId): bool {
   if (tieneAlcanceGlobalTurnos()) {
@@ -49,7 +50,6 @@ function filtrarRepososPorTurno(PDO $pdo, array $filas, string $idKey): array {
   return $filtradas;
 }
 
-requireLogin();
 require_once __DIR__ . "/../includes/conexion.php";
 
 $msg = trim($_GET["msg"] ?? "");

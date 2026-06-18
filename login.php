@@ -16,7 +16,9 @@ $next = safeNext($_GET["next"] ?? "", BASE_URL . "/modulos/asistencias.php");
 
 $ACTION = BASE_URL . "/procesos/login_procesar.php";
 $logo   = BASE_URL . "/assets/img/logo_institucion.png";
-$fondo  = BASE_URL . "/assets/img/Gemini_Generated_Image_3t4ws33t4ws33t4w.png";
+$fondoRel = "/assets/img/Gemini_Generated_Image_3t4ws33t4ws33t4w.png";
+$fondoPath = __DIR__ . $fondoRel;
+$fondo  = is_file($fondoPath) ? (BASE_URL . $fondoRel) : "";
 $theme  = BASE_URL . "/assets/css/app-theme.css?v=login-institucional";
 ?>
 <!DOCTYPE html>

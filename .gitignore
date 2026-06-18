@@ -74,4 +74,10 @@ venv/
 *.zip
 *.rar
 *.7z
-
+# Auditorias y backups locales generados por limpieza
+_auditoria_limpieza_*/
+_backups_cambios/
+_fixes/
+# Archivos subidos por usuarios / datos generados
+uploads/empleados/*
+!uploads/empleados/.gitkeep

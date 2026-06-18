@@ -114,15 +114,35 @@ if (isset($_FILES["foto"]) && is_array($_FILES["foto"]) && (int)($_FILES["foto"]
 
     $fotoArchivo = "uploads/empleados/" . $nombreArchivo;
 }
-// Insertar empleado
-$ins = $pdo->prepare("
-  INSERT INTO empleados (cedula, nombres, apellidos, telefono, cargo_id, tipo_contrato, turno_id, estado, foto_archivo)
-    VALUES (?, ?, ?, NULL, ?, 'TURNO', ?, 'ACTIVO', ?)
-");
-$ins->execute([$cedula, $nombres, $apellidos, $cargo_id, $turno_id, $fotoArchivo]);
+// MB5C: registro seguro de personal con transaccion y limpieza de foto si falla la DB.
+try {
+  $pdo->beginTransaction();
 
-$nuevoEmpleadoId = (int)$pdo->lastInsertId();
+  $ins = $pdo->prepare("
+    INSERT INTO empleados (cedula, nombres, apellidos, telefono, cargo_id, tipo_contrato, turno_id, estado, foto_archivo)
+      VALUES (?, ?, ?, NULL, ?, 'TURNO', ?, 'ACTIVO', ?)
+  ");
+  $ins->execute([$cedula, $nombres, $apellidos, $cargo_id, $turno_id, $fotoArchivo]);
 
-header("Location: " . BASE_URL . "/modulos/personal.php?msg=" . urlencode("Personal registrado exitosamente") . "&ok_personal=1&empleado_id=" . $nuevoEmpleadoId);
-exit;
+  $nuevoEmpleadoId = (int)$pdo->lastInsertId();
 
+  $pdo->commit();
+
+  header("Location: " . BASE_URL . "/modulos/personal.php?msg=" . urlencode("Personal registrado exitosamente") . "&ok_personal=1&empleado_id=" . $nuevoEmpleadoId);
+  exit;
+
+} catch (Throwable $e) {
+  if ($pdo->inTransaction()) {
+    $pdo->rollBack();
+  }
+
+  if ($fotoArchivo !== null && $fotoArchivo !== "") {
+    $rutaFoto = __DIR__ . "/../" . ltrim((string)$fotoArchivo, "/");
+    if (is_file($rutaFoto)) {
+      @unlink($rutaFoto);
+    }
+  }
+
+  header("Location: " . BASE_URL . "/modulos/personal.php?err=" . urlencode("No se pudo registrar el personal."));
+  exit;
+}

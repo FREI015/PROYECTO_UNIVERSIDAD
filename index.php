@@ -236,7 +236,7 @@ if ($asistenciasExiste && $fechaCol !== "" && $empleadoCol !== "") {
   $actividadHoy = inicioRows($pdo, "
     SELECT
       CONCAT(e.nombres, ' ', e.apellidos) AS empleado,
-      e.cédula,
+      e.cedula,
       c.nombre AS cargo,
       COALESCE(t.nombre, 'SIN TURNO') AS turno,
       $selectEstado,

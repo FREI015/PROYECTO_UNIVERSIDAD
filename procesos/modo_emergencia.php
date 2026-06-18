@@ -11,6 +11,7 @@ if ($_SERVER["REQUEST_METHOD"] !== "POST") {
   go(BASE_URL . "/modulos/asistencias.php?err=" . urlencode("Acceso inválido"));
 }
 
+requireLogin();
 verifyCsrfOrRedirect(BASE_URL . "/modulos/asistencias.php?err=" . urlencode("Solicitud inválida. Intenta nuevamente."));
 
 // Verificar acción: activar o desactivar

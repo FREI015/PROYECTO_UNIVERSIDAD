@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . "/../includes/config.php";
 require_once __DIR__ . "/../includes/funciones.php";
+requireLogin();
 requirePermiso("ver_permisos", BASE_URL . "/index.php");
 function permisoEmpleadoPermitido(PDO $pdo, int $empleadoId): bool {
   if (tieneAlcanceGlobalTurnos()) {
@@ -51,7 +52,6 @@ function filtrarPermisosPorTurno(PDO $pdo, array $filas, string $idKey): array {
 
 require_once __DIR__ . "/../includes/conexion.php";
 
-requireLogin();
 
 $msg = trim($_GET["msg"] ?? "");
 $err = trim($_GET["err"] ?? "");

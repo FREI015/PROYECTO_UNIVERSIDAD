@@ -1,13 +1,13 @@
 <?php
 require_once __DIR__ . "/../includes/config.php";
 require_once __DIR__ . "/../includes/funciones.php";
+requireLogin();
 requirePermiso("ver_personal", BASE_URL . "/index.php");
+require_once __DIR__ . "/../includes/conexion.php";
+
 $turnosPermitidos = turnosPermitidosPorRol();
 $tieneAlcanceGlobal = tieneAlcanceGlobalTurnos();
 $turnoIdsPermitidos = [];
-
-requireLogin();
-require_once __DIR__ . "/../includes/conexion.php";
 
 $msg = trim($_GET["msg"] ?? "");
 $err = trim($_GET["err"] ?? "");
