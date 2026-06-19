@@ -3238,7 +3238,6 @@ table thead th:last-child{
 }
 /* END_25A2J2_FECHAS_HEADERS_LIMPIAR_CSS */
 
-/* 25A2J3_FIX_DATE_PICKER_CSS */
 /*
   Corrige apertura del calendario nativo en los campos Desde/Hasta.
   El input real queda invisible para conservar la estetica,
@@ -3263,7 +3262,6 @@ table thead th:last-child{
   border-color:var(--ux-primary) !important;
   box-shadow:0 0 0 4px rgba(128,0,32,.10) !important;
 }
-/* END_25A2J3_FIX_DATE_PICKER_CSS */
 
 /* 25A2K4_PERMISOS_FORM_RESPONSIVE_FINAL */
 /*

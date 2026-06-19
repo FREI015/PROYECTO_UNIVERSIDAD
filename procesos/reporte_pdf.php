@@ -456,7 +456,6 @@ foreach ($permRows as $p) {
 }
 
 // aplicar asistencias (si no hay reposo/permiso)
-// CORREGIDO para ENUM('ASISTIO','RETARDO','FALTA')
 foreach ($asisRows as $a) {
   $eid = (int)$a["empleado_id"];
   $f = $a["fecha"];
@@ -703,7 +702,7 @@ if ($esIndividual && count($empleados) > 0) {
 <table>
   <tr>
     <th>Cédula</th><th>Empleado</th><th>Turno</th>
-    <th>Asistió</th><th>A tiempo</th><th>Tarde</th><th>Permiso</th><th>Reposo</th><th>Ausente</th>
+    <th>Asistió</th><th>A tiempo</th><th>Tarde</th><th>Salida tardía</th><th>Permiso</th><th>Reposo</th><th>Ausente</th>
   </tr>';
 
   foreach ($resumen as $r) {
@@ -752,8 +751,6 @@ $html .= '</table>';
 
 $pdf->writeHTML($html, true, false, true, false, '');
 
-$debugSalidaPdf = __DIR__ . "/../_fixes/salida_detectada_antes_pdf.txt";
-limpiarSalidaAntesPdf($debugSalidaPdf);
 
 if (headers_sent($archivoHeaders, $lineaHeaders)) {
   die("No se pudo generar el PDF porque ya se enviaron encabezados en: " . $archivoHeaders . " línea " . $lineaHeaders);

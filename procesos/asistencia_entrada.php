@@ -133,8 +133,7 @@ if ($horaFin !== null) {
 
 /**
  * Usa tolerancia configurada cuando esté disponible.
- * (Este es el FIX de tu error)
- */
+*/
 $tolMin = 0;
 if (defined("RETARDO_TOLERANCIA_MINUTOS")) {
   $tolMin = (int) constant("RETARDO_TOLERANCIA_MINUTOS");
