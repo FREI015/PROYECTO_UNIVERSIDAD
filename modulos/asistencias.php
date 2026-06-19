@@ -1749,6 +1749,7 @@ if ($inicialFoto === "") {
   }
 })();
 </script>
+<script src="<?php echo e(BASE_URL); ?>/assets/js/app-feedback.js"></script>
 <?php require_once __DIR__ . "/../includes/footer.php"; ?>
 
 

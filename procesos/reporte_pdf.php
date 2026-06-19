@@ -364,7 +364,7 @@ $placeholders = implode(",", array_fill(0, count($empIds), "?"));
 // 2) Data en bloque
 // asistencias en rango
 $sqlAsis = "
-  SELECT empleado_id, fecha, estado, minutos_tarde
+  SELECT empleado_id, fecha, estado, minutos_tarde, salida_estado, minutos_salida_tardia, observacion_sistema
   FROM asistencias
   WHERE fecha BETWEEN ? AND ?
     AND empleado_id IN ($placeholders)
@@ -459,39 +459,49 @@ foreach ($permRows as $p) {
 // CORREGIDO para ENUM('ASISTIO','RETARDO','FALTA')
 foreach ($asisRows as $a) {
   $eid = (int)$a["empleado_id"];
-  $f   = $a["fecha"];
+  $f = $a["fecha"];
   if (!isset($statusMap[$eid][$f])) continue;
 
-  // Si ya está justificado, no se sobreescribe
-  if ($statusMap[$eid][$f]['estado'] === 'REPOSO' || $statusMap[$eid][$f]['estado'] === 'PERMISO') {
+  if ($statusMap[$eid][$f]["estado"] === "REPOSO" || $statusMap[$eid][$f]["estado"] === "PERMISO") {
     continue;
   }
 
   $minT = (int)($a["minutos_tarde"] ?? 0);
-  $est  = strtoupper((string)$a["estado"]);
+  $est = strtoupper((string)$a["estado"]);
+  $salidaEstado = strtoupper(trim((string)($a["salida_estado"] ?? "")));
+  $minSalidaTardia = (int)($a["minutos_salida_tardia"] ?? 0);
+  $obsSalida = trim((string)($a["observacion_sistema"] ?? ""));
+  $detalleSalida = "";
 
-  // FALTA => Ausente (registrada)
+  if ($salidaEstado === "SALIDA_TARDIA" || $minSalidaTardia > 0) {
+    $detalleSalida = " | Salida tardía" . ($minSalidaTardia > 0 ? " ({$minSalidaTardia} min)" : "");
+  } elseif ($obsSalida !== "" && $salidaEstado !== "NORMAL") {
+    $detalleSalida = " | " . $obsSalida;
+  }
+
   if ($est === "FALTA") {
     $statusMap[$eid][$f] = [
-      'estado' => 'AUSENTE',
-      'detalle' => 'Falta (registrada)',
-      'minutos_tarde' => 0
+      "estado" => "AUSENTE",
+      "detalle" => "Falta (registrada)",
+      "minutos_tarde" => 0
     ];
     continue;
   }
 
   if ($est === "RETARDO" || $minT > 0) {
     $statusMap[$eid][$f] = [
-      'estado' => 'RETARDO',
-      'detalle' => "Retardo" . ($minT > 0 ? " ({$minT} min)" : ""),
-      'minutos_tarde' => $minT
+      "estado" => "RETARDO",
+      "detalle" => "Retardo" . ($minT > 0 ? " ({$minT} min)" : "") . $detalleSalida,
+      "minutos_tarde" => $minT
     ];
   } else {
-    // ASISTIO
+    $estadoDia = $detalleSalida !== "" ? "SALIDA_TARDIA" : "A_TIEMPO";
+    $detalleDia = $detalleSalida !== "" ? "Asistió a tiempo" . $detalleSalida : "Asistió a tiempo";
+
     $statusMap[$eid][$f] = [
-      'estado' => 'A_TIEMPO',
-      'detalle' => "Asistió a tiempo",
-      'minutos_tarde' => 0
+      "estado" => $estadoDia,
+      "detalle" => $detalleDia,
+      "minutos_tarde" => 0
     ];
   }
 }
@@ -502,6 +512,7 @@ $sumGlobal = [
   'dias' => count($dates),
   'a_tiempo' => 0,
   'retardo' => 0,
+  "salida_tardia" => 0,
   'permiso' => 0,
   'reposo' => 0,
   'ausente' => 0,
@@ -518,6 +529,7 @@ foreach ($empleados as $emp) {
   $cnt = [
     'a_tiempo' => 0,
     'retardo' => 0,
+    "salida_tardia" => 0,
     'permiso' => 0,
     'reposo' => 0,
     'ausente' => 0,
@@ -527,7 +539,8 @@ foreach ($empleados as $emp) {
   foreach ($dates as $d) {
     $st = $statusMap[$eid][$d]['estado'];
 
-    if ($st === 'A_TIEMPO') $cnt['a_tiempo']++;
+    if ($st === "A_TIEMPO" || $st === "SALIDA_TARDIA") $cnt["a_tiempo"]++;
+    if ($st === "SALIDA_TARDIA") $cnt["salida_tardia"]++;
     elseif ($st === 'RETARDO') $cnt['retardo']++;
     elseif ($st === 'PERMISO') $cnt['permiso']++;
     elseif ($st === 'REPOSO') $cnt['reposo']++;
@@ -556,6 +569,7 @@ foreach ($empleados as $emp) {
     'asistio' => $cnt['asistio'],
     'a_tiempo' => $cnt['a_tiempo'],
     'retardo' => $cnt['retardo'],
+    "salida_tardia" => $cnt["salida_tardia"],
     'permiso' => $cnt['permiso'],
     'reposo' => $cnt['reposo'],
     'ausente' => $cnt['ausente'],
@@ -563,6 +577,7 @@ foreach ($empleados as $emp) {
 
   $sumGlobal['a_tiempo'] += $cnt['a_tiempo'];
   $sumGlobal['retardo']  += $cnt['retardo'];
+  $sumGlobal["salida_tardia"] += $cnt["salida_tardia"];
   $sumGlobal['permiso']  += $cnt['permiso'];
   $sumGlobal['reposo']   += $cnt['reposo'];
   $sumGlobal['ausente']  += $cnt['ausente'];
@@ -630,12 +645,13 @@ $html = '
 <div class="box">
   <table>
     <tr>
-      <th>Total Asistió</th><th>A tiempo</th><th>Retardos</th><th>Permisos</th><th>Reposos</th><th>Ausencias</th>
+      <th>Total Asistió</th><th>A tiempo</th><th>Retardos</th><th>Salidas tardías</th><th>Permisos</th><th>Reposos</th><th>Ausencias</th>
     </tr>
     <tr>
       <td>'.$sumGlobal["asistio"].'</td>
       <td>'.$sumGlobal["a_tiempo"].'</td>
       <td>'.$sumGlobal["retardo"].'</td>
+      <td>'.$sumGlobal["salida_tardia"].'</td>
       <td>'.$sumGlobal["permiso"].'</td>
       <td>'.$sumGlobal["reposo"].'</td>
       <td>'.$sumGlobal["ausente"].'</td>
@@ -667,12 +683,13 @@ if ($esIndividual && count($empleados) > 0) {
     $html .= '<div class="box">
       <table>
         <tr>
-          <th>Total Asistió</th><th>A tiempo</th><th>Retardos</th><th>Permisos</th><th>Reposos</th><th>Ausencias</th>
+          <th>Total Asistió</th><th>A tiempo</th><th>Retardos</th><th>Salidas tardías</th><th>Permisos</th><th>Reposos</th><th>Ausencias</th>
         </tr>
         <tr>
           <td>'.$r["asistio"].'</td>
           <td>'.$r["a_tiempo"].'</td>
           <td>'.$r["retardo"].'</td>
+          <td>'.$r["salida_tardia"].'</td>
           <td>'.$r["permiso"].'</td>
           <td>'.$r["reposo"].'</td>
           <td>'.$r["ausente"].'</td>
@@ -697,6 +714,7 @@ if ($esIndividual && count($empleados) > 0) {
       <td>'.$r["asistio"].'</td>
       <td>'.$r["a_tiempo"].'</td>
       <td>'.$r["retardo"].'</td>
+      <td>'.$r["salida_tardia"].'</td>
       <td>'.$r["permiso"].'</td>
       <td>'.$r["reposo"].'</td>
       <td>'.$r["ausente"].'</td>

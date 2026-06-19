@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS empleados (
   condicion_baja VARCHAR(120) NULL,
   fecha_baja DATE NULL,
   creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  actualizado_en TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT fk_empleado_cargo FOREIGN KEY (cargo_id) REFERENCES cargos(id),
   CONSTRAINT fk_empleado_turno FOREIGN KEY (turno_id) REFERENCES turnos(id)
 ) ENGINE=InnoDB;
@@ -54,9 +55,13 @@ CREATE TABLE IF NOT EXISTS asistencias (
   hora_salida TIME NULL,
   minutos_tarde INT NOT NULL DEFAULT 0,
   horas_trabajadas DECIMAL(5,2) NULL,
+  salida_estado VARCHAR(30) NULL DEFAULT NULL,
+  minutos_salida_tardia INT NOT NULL DEFAULT 0,
   estado ENUM('ASISTIO','RETARDO','FALTA') NOT NULL DEFAULT 'ASISTIO',
   registrado_por INT NULL,
+  observacion_sistema VARCHAR(255) NULL DEFAULT NULL,
   creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  actualizado_en TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uq_asistencia_dia (empleado_id, fecha),
   CONSTRAINT fk_asistencia_empleado FOREIGN KEY (empleado_id) REFERENCES empleados(id) ON DELETE CASCADE,
   CONSTRAINT fk_asistencia_usuario FOREIGN KEY (registrado_por) REFERENCES usuarios(id) ON DELETE SET NULL
@@ -73,6 +78,7 @@ CREATE TABLE IF NOT EXISTS permisos (
   estado ENUM('ACTIVO','CERRADO','ANULADO') NOT NULL DEFAULT 'ACTIVO',
   creado_por INT NULL,
   creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  actualizado_en TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT fk_permiso_empleado FOREIGN KEY (empleado_id) REFERENCES empleados(id) ON DELETE CASCADE,
   CONSTRAINT fk_permiso_usuario FOREIGN KEY (creado_por) REFERENCES usuarios(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
@@ -89,6 +95,11 @@ CREATE TABLE IF NOT EXISTS reposos (
   estado ENUM('ACTIVO','CERRADO','ANULADO') NOT NULL DEFAULT 'ACTIVO',
   creado_por INT NULL,
   creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  actualizado_en TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT fk_reposo_empleado FOREIGN KEY (empleado_id) REFERENCES empleados(id) ON DELETE CASCADE,
   CONSTRAINT fk_reposo_usuario FOREIGN KEY (creado_por) REFERENCES usuarios(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
+INSERT IGNORE INTO turnos (id, nombre, hora_inicio, hora_fin) VALUES
+(1, 'MATUTINO', '07:00:00', '12:00:00'),
+(2, 'VESPERTINO', '13:00:00', '17:00:00'),
+(3, 'COMPLETO', '07:00:00', '17:00:00');

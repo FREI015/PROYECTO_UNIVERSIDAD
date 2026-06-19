@@ -45,28 +45,28 @@ if (strtoupper(trim((string)$emp["estado"])) !== "ACTIVO") {
 }
 
 if (!puedeVerTurno($emp["turno_nombre"] ?? "")) {
-    header("Location: " . BASE_URL . "/modulos/asistencias.php?err=" . urlencode("No tienes permiso para marcar asistencia de este turno"));
-    exit;
+  header("Location: " . BASE_URL . "/modulos/asistencias.php?err=" . urlencode("No tienes permiso para marcar asistencia de este turno"));
+  exit;
 }
+
 $horaInicio = $emp["hora_inicio"] ?: "07:00:00";
 $horaFin    = $emp["hora_fin"] ?: null;
 
 $fecha_asistencia = $hoy_real;
+
 if ($horaFin !== null) {
   $hi = (string)$horaInicio;
   $hf = (string)$horaFin;
 
-  if ($hi > $hf) {
-    if ($hora_now < $hf) {
-      $fecha_asistencia = $now->modify("-1 day")->format("Y-m-d");
-    }
+  if ($hi > $hf && $hora_now < $hf) {
+    $fecha_asistencia = $now->modify("-1 day")->format("Y-m-d");
   }
 }
 
 $stmt = $pdo->prepare("
   SELECT id, estado, hora_entrada, hora_salida
   FROM asistencias
-  WHERE empleado_id=? AND fecha=?
+  WHERE empleado_id = ? AND fecha = ?
   LIMIT 1
 ");
 $stmt->execute([$empleado_id, $fecha_asistencia]);
@@ -89,25 +89,87 @@ if ($horaFin !== null) {
   $hi = (string)$horaInicio;
   $hf = (string)$horaFin;
 
-  if ($hi > $hf) {
-    if ($entrada_time < $hf) {
-      $inicio = $inicio->modify("+1 day");
-    }
+  if ($hi > $hf && $entrada_time < $hf) {
+    $inicio = $inicio->modify("+1 day");
   }
 }
 
 $diffSec = $now->getTimestamp() - $inicio->getTimestamp();
-if ($diffSec < 0) $diffSec = 0;
+
+if ($diffSec < 0) {
+  header("Location: " . BASE_URL . "/modulos/asistencias.php?err=" . urlencode("La hora de salida no puede ser anterior a la entrada"));
+  exit;
+}
 
 $horas_trab = round($diffSec / 3600, 2);
 
+$salidaEstado = "NORMAL";
+$minutosSalidaTardia = 0;
+$observacionSistema = null;
+
+if ($horaFin !== null) {
+  $hi = (string)$horaInicio;
+  $hf = (string)$horaFin;
+
+  $finTurno = new DateTimeImmutable($fecha_asistencia . " " . $hf, $tz);
+
+  if ($hi > $hf) {
+    $finTurno = $finTurno->modify("+1 day");
+  }
+
+  $diffFinSec = $now->getTimestamp() - $finTurno->getTimestamp();
+
+  if ($diffFinSec > 0) {
+    $minutosSalidaTardia = (int)ceil($diffFinSec / 60);
+  }
+
+  $toleranciaSalidaTardia = 0;
+  if (defined("SALIDA_TARDIA_TOLERANCIA_MINUTOS")) {
+    $toleranciaSalidaTardia = max(0, (int)constant("SALIDA_TARDIA_TOLERANCIA_MINUTOS"));
+  }
+
+  if ($minutosSalidaTardia > $toleranciaSalidaTardia) {
+    $salidaEstado = "SALIDA_TARDIA";
+    $observacionSistema = "Salida tardía: {$minutosSalidaTardia} min después del fin del turno ({$hf}).";
+  }
+} else {
+  $salidaEstado = "SIN_HORARIO";
+  $observacionSistema = "No se pudo comparar la salida porque el turno no tiene hora_fin.";
+}
+
 $upd = $pdo->prepare("
   UPDATE asistencias
-  SET hora_salida=?, horas_trabajadas=?
-  WHERE id=?
+  SET hora_salida = ?,
+      horas_trabajadas = ?,
+      salida_estado = ?,
+      minutos_salida_tardia = ?,
+      observacion_sistema = ?
+  WHERE id = ?
 ");
-$upd->execute([$hora_now, $horas_trab, (int)$row["id"]]);
+$upd->execute([
+  $hora_now,
+  $horas_trab,
+  $salidaEstado,
+  $minutosSalidaTardia,
+  $observacionSistema,
+  (int)$row["id"]
+]);
 
-header("Location: " . BASE_URL . "/modulos/asistencias.php?msg=" . urlencode("Salida registrada con éxito") . "&ok_asistencia=salida&empleado_id=" . $empleado_id . "&estado=" . urlencode((string)$row["estado"]) . "&hora=" . urlencode($hora_now));
+$mensaje = "Salida registrada con éxito";
+if ($salidaEstado === "SALIDA_TARDIA") {
+  $mensaje = "Salida registrada como tardía ({$minutosSalidaTardia} min)";
+} elseif ($salidaEstado === "SIN_HORARIO") {
+  $mensaje = "Salida registrada sin comparación de horario";
+}
+
+header(
+  "Location: " . BASE_URL .
+  "/modulos/asistencias.php?msg=" . urlencode($mensaje) .
+  "&ok_asistencia=salida" .
+  "&empleado_id=" . $empleado_id .
+  "&estado=" . urlencode((string)$row["estado"]) .
+  "&salida_estado=" . urlencode($salidaEstado) .
+  "&min_salida_tardia=" . urlencode((string)$minutosSalidaTardia) .
+  "&hora=" . urlencode($hora_now)
+);
 exit;
-
