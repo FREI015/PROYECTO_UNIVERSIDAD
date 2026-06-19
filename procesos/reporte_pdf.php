@@ -160,6 +160,33 @@ function pdfEsc($value): string {
   return htmlspecialchars((string)$value, ENT_QUOTES, "UTF-8");
 }
 
+
+function reportePdfAgregarCintillo(TCPDF $pdf): void {
+  // MB13B-R2-CINTILLO-PDF
+  $cintilloJpg = __DIR__ . "/../assets/img/institucional/cintillo_institucional_final.jpeg";
+  $cintilloPng = __DIR__ . "/../assets/img/institucional/cintillo_institucional_final.jpeg";
+
+  if (is_file($cintilloJpg)) {
+    $pdf->Image($cintilloJpg, 10, 7, 190, 0, "JPG", "", "T", false, 300, "C");
+    $pdf->SetY(42);
+    return;
+  }
+
+  if (is_file($cintilloPng)) {
+    $pdf->Image($cintilloPng, 10, 7, 190, 0, "PNG", "", "T", false, 300, "C");
+    $pdf->SetY(42);
+    return;
+  }
+
+  $pdf->SetY(8);
+  $pdf->SetFont("helvetica", "", 8);
+  $pdf->Cell(0, 4, "Ministerio del Poder Popular para la Educación", 0, 1, "C");
+  $pdf->SetFont("helvetica", "B", 14);
+  $pdf->Cell(0, 6, "EDUCACIÓN", 0, 1, "C");
+  $pdf->SetFont("helvetica", "B", 7);
+  $pdf->Cell(0, 4, "E.B.N Dr. Enrique Delgado Palacios   CIRCUITO LONGARAY   Cod. Plantel OD723101   Cod. Institucional 00673395   RIF 305187355", 0, 1, "C");
+  $pdf->Ln(4);
+}
 function rangeFromPeriodo(string $periodo, string $fechaBase): array {
   $dt = new DateTime($fechaBase);
   $periodo = strtoupper(trim($periodo));
@@ -324,6 +351,7 @@ if (!$empleados) {
   $pdf->SetTitle("Reporte de Asistencias");
   $pdf->SetMargins(12, 12, 12);
   $pdf->AddPage();
+reportePdfAgregarCintillo($pdf);
   $pdf->SetFont("helvetica", "", 12);
   $pdf->Write(0, "No hay empleados activos para el filtro seleccionado.", "", 0, "L", true, 0, false, false, 0);
   $pdf->Output("reporte.pdf", "I");
@@ -562,6 +590,7 @@ $pdf->SetTitle("Reporte de Asistencias");
 $pdf->SetMargins(12, 12, 12);
 $pdf->SetAutoPageBreak(true, 12);
 $pdf->AddPage();
+reportePdfAgregarCintillo($pdf);
 $pdf->SetFont("helvetica", "", 10);
 
 $generado = date("Y-m-d H:i");

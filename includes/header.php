@@ -202,6 +202,10 @@ $logoutUrl = BASE_URL . "/procesos/logout.php";
   $headerFecha = date("d/m/Y");
 ?>
 
+<?php
+// MB13B-R2-CINTILLO-HEADER-INCLUDE
+require_once __DIR__ . '/cintillo_institucional.php';
+?>
 <header class="app-topline">
   <div class="app-topline-inner">
     <a class="app-brand" href="<?php echo e(BASE_URL); ?>/index.php" aria-label="Inicio">

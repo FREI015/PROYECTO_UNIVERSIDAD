@@ -1,83 +1,63 @@
 .DS_Store
 Thumbs.db
+desktop.ini
+
+# Logs y temporales
 *.log
 *.tmp
 *.temp
-*.bak
 *.old
-.env
+*.orig
 
-# ---- Reglas seguras añadidas automáticamente ----
-
-
-# Sistema
-.DS_Store
-Thumbs.db
-desktop.ini
-
-# VS Code
-.vscode/*
-!.vscode/extensions.json
-*.code-workspace
-
-# Logs
-*.log
-logs/
-
-# Variables de entorno / secretos
+# Entorno local
 .env
 .env.*
 !.env.example
 
-# Archivos sensibles comunes
-config.php
-conexion.php
-database.php
-db.php
-credentials.json
-secrets.json
-*.key
-*.pem
-*.p12
-*.pfx
-
-# Backups
-*.bak
-*.backup
-*.old
-*.tmp
-*.temp
-
-# Dependencias
-node_modules/
+# Dependencias / caches
 vendor/
-
-# Builds
-dist/
-build/
-out/
+node_modules/
 .cache/
+tmp/
+temp/
 
-# Python
-__pycache__/
-*.pyc
-.venv/
-venv/
+# IDE / editores
+.vscode/
+.idea/
 
-# Bases de datos locales
+# Base de datos local o generada
 *.sqlite
 *.sqlite3
 *.db
-*.sql
+
+# IMPORTANTE:
+# No ignorar los scripts SQL del proyecto.
+# sql/bd.sql debe poder versionarse.
+!sql/
+!sql/*.sql
 
 # Comprimidos
 *.zip
 *.rar
 *.7z
-# Auditorias y backups locales generados por limpieza
-_auditoria_limpieza_*/
-_backups_cambios/
+
+# Backups manuales
+*.bak
+*.bak_*
+*.bak-*
+*.backup
+
+# Reportes temporales generados por reparaciones
+reporte_*.txt
+*_whatsapp_*.txt
+
+# Carpetas locales de reparacion / respaldo
+_backups_locales/
+_reportes_reparacion/
+
+# Fixes temporales
 _fixes/
+
 # Archivos subidos por usuarios / datos generados
 uploads/empleados/*
 !uploads/empleados/.gitkeep

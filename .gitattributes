@@ -1,0 +1,23 @@
+# ============================================================
+# Normalizacion de archivos del proyecto
+# Evita cambios falsos por saltos de linea Windows/Linux
+# ============================================================
+
+* text=auto
+
+*.php  text eol=lf
+*.css  text eol=lf
+*.js   text eol=lf
+*.sql  text eol=lf
+*.md   text eol=lf
+*.html text eol=lf
+*.json text eol=lf
+*.xml  text eol=lf
+
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.pdf  binary
+*.zip  binary

@@ -4890,3 +4890,420 @@ form.reposos-form-modern .grid > *:has(input[type="submit"]){
   padding-top:4px;
 }
 /* END_25A2P10_REPOSOS_CSS_FINAL */
+
+/* ==============================
+   MB13B-R2-CINTILLO-HTML-CSS
+   CINTILLO INSTITUCIONAL
+   ============================== */
+
+.cintillo-institucional {
+    width: 100%;
+    background: #ffffff;
+    padding: 8px 14px 4px 14px;
+    box-sizing: border-box;
+    font-family: Arial, Helvetica, sans-serif;
+    color: #1f2937;
+    border-bottom: 1px solid #d1d5db;
+    position: relative;
+    z-index: 50;
+}
+
+.cintillo-contenido {
+    width: 100%;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+}
+
+.cintillo-logo-izquierdo {
+    width: 78px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.logo-bandera {
+    width: 58px;
+    height: 24px;
+    margin: 0 auto 2px auto;
+    transform: skewY(-8deg);
+    border-radius: 2px;
+    overflow: hidden;
+    box-shadow: 0 1px 2px rgba(0,0,0,.12);
+}
+
+.franja {
+    height: 8px;
+    width: 100%;
+}
+
+.amarillo {
+    background: #f4c430;
+}
+
+.azul {
+    background: #1f4fa3;
+}
+
+.rojo {
+    background: #c8102e;
+}
+
+.texto-logo-pequeno {
+    font-size: 5px;
+    font-weight: bold;
+    letter-spacing: 0.2px;
+    color: #1e3a8a;
+    line-height: 1;
+}
+
+.texto-logo-venezuela {
+    font-size: 9px;
+    font-weight: 800;
+    color: #1e3a8a;
+    letter-spacing: 0.8px;
+    line-height: 1.1;
+}
+
+.cintillo-centro {
+    flex: 1;
+    padding-left: 10px;
+    padding-top: 3px;
+    text-align: left;
+}
+
+.ministerio-texto {
+    font-size: 13px;
+    font-weight: 400;
+    color: #374151;
+    line-height: 1;
+}
+
+.educacion-texto {
+    margin-top: 2px;
+    font-size: 31px;
+    font-weight: 900;
+    letter-spacing: 1.5px;
+    color: #1f2d4d;
+    line-height: 1;
+}
+
+.cintillo-logo-derecho {
+    width: 74px;
+    height: 58px;
+    display: flex;
+    justify-content: flex-end;
+    align-items: flex-start;
+    flex-shrink: 0;
+}
+
+.cintillo-logo-derecho img {
+    max-width: 62px;
+    max-height: 58px;
+    object-fit: contain;
+}
+
+.cintillo-datos {
+    width: 100%;
+    margin-top: 4px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #111827;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+@media screen and (max-width: 700px) {
+    .cintillo-institucional {
+        padding: 8px;
+    }
+
+    .cintillo-logo-izquierdo {
+        width: 62px;
+    }
+
+    .logo-bandera {
+        width: 48px;
+        height: 21px;
+    }
+
+    .franja {
+        height: 7px;
+    }
+
+    .ministerio-texto {
+        font-size: 10px;
+    }
+
+    .educacion-texto {
+        font-size: 22px;
+        letter-spacing: 1px;
+    }
+
+    .cintillo-logo-derecho {
+        width: 55px;
+    }
+
+    .cintillo-logo-derecho img {
+        max-width: 48px;
+        max-height: 48px;
+    }
+
+    .cintillo-datos {
+        font-size: 9px;
+        white-space: normal;
+        line-height: 1.3;
+    }
+}
+
+@media print {
+    .cintillo-institucional {
+        border-bottom: none;
+        padding: 6px 10px 3px 10px;
+    }
+
+    .cintillo-datos {
+        font-size: 10px;
+    }
+}
+
+/* FIN MB13B-R2-CINTILLO-HTML-CSS */
+
+/* ============================================================
+   MB13C-R2-AJUSTE-CINTILLO-COMPACTO
+   Ajuste visual: cintillo web más compacto, proporcional y alineado
+   ============================================================ */
+
+.cintillo-institucional {
+    min-height: 72px !important;
+    max-height: 86px !important;
+    padding: 6px 14px 5px 14px !important;
+    overflow: hidden !important;
+    display: block !important;
+}
+
+.cintillo-institucional * {
+    box-sizing: border-box !important;
+}
+
+.cintillo-contenido {
+    min-height: 48px !important;
+    max-height: 54px !important;
+    align-items: center !important;
+}
+
+.cintillo-logo-izquierdo {
+    width: 82px !important;
+    min-width: 82px !important;
+    max-width: 82px !important;
+}
+
+.logo-bandera {
+    width: 54px !important;
+    height: 21px !important;
+    margin: 0 auto 2px auto !important;
+}
+
+.franja {
+    height: 7px !important;
+}
+
+.texto-logo-pequeno {
+    font-size: 4.8px !important;
+    line-height: 1 !important;
+    margin: 0 !important;
+}
+
+.texto-logo-venezuela {
+    font-size: 8.4px !important;
+    line-height: 1 !important;
+    margin: 0 !important;
+}
+
+.cintillo-centro {
+    padding-left: 12px !important;
+    padding-top: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    min-height: 48px !important;
+}
+
+.ministerio-texto {
+    font-size: 12px !important;
+    line-height: 1.05 !important;
+    margin: 0 !important;
+}
+
+.educacion-texto {
+    font-size: 25px !important;
+    line-height: .95 !important;
+    letter-spacing: 1.2px !important;
+    margin: 1px 0 0 0 !important;
+}
+
+.cintillo-logo-derecho {
+    width: 68px !important;
+    min-width: 68px !important;
+    max-width: 68px !important;
+    height: 50px !important;
+    max-height: 50px !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+    overflow: hidden !important;
+}
+
+.cintillo-logo-derecho img {
+    width: 48px !important;
+    height: 48px !important;
+    max-width: 48px !important;
+    max-height: 48px !important;
+    object-fit: contain !important;
+    display: block !important;
+}
+
+.cintillo-datos {
+    margin-top: 2px !important;
+    font-size: 9.8px !important;
+    line-height: 1.15 !important;
+    max-height: 16px !important;
+    text-align: center !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+}
+
+@media screen and (max-width: 700px) {
+    .cintillo-institucional {
+        min-height: auto !important;
+        max-height: none !important;
+        padding: 6px 8px 5px 8px !important;
+    }
+
+    .cintillo-contenido {
+        min-height: 44px !important;
+        max-height: none !important;
+        align-items: center !important;
+    }
+
+    .cintillo-logo-izquierdo {
+        width: 58px !important;
+        min-width: 58px !important;
+        max-width: 58px !important;
+    }
+
+    .logo-bandera {
+        width: 42px !important;
+        height: 18px !important;
+    }
+
+    .franja {
+        height: 6px !important;
+    }
+
+    .texto-logo-pequeno {
+        font-size: 4px !important;
+    }
+
+    .texto-logo-venezuela {
+        font-size: 7px !important;
+    }
+
+    .ministerio-texto {
+        font-size: 9.5px !important;
+    }
+
+    .educacion-texto {
+        font-size: 19px !important;
+        letter-spacing: .8px !important;
+    }
+
+    .cintillo-logo-derecho {
+        width: 46px !important;
+        min-width: 46px !important;
+        max-width: 46px !important;
+        height: 42px !important;
+    }
+
+    .cintillo-logo-derecho img {
+        width: 38px !important;
+        height: 38px !important;
+        max-width: 38px !important;
+        max-height: 38px !important;
+    }
+
+    .cintillo-datos {
+        font-size: 8.5px !important;
+        white-space: normal !important;
+        max-height: none !important;
+        line-height: 1.2 !important;
+    }
+}
+
+/* FIN MB13C-R2-AJUSTE-CINTILLO-COMPACTO */
+
+
+/* MB13E-R1-HEADER-INSTITUCIONAL-INTEGRADO */
+/* Une visualmente el cintillo institucional con la navegación principal. */
+
+.cintillo-oficial-r9,
+.cintillo-oficial-r10,
+.cintillo-oficial-r11,
+.cintillo-real-r5,
+.cintillo-real-r6,
+.cintillo-real-r7,
+.cintillo-real-r8{
+  border-bottom:0 !important;
+  box-shadow:none !important;
+  margin-bottom:0 !important;
+}
+
+.cintillo-oficial-r9-inner,
+.cintillo-oficial-r10-inner,
+.cintillo-oficial-r11-inner,
+.cintillo-real-r5-inner,
+.cintillo-real-r6-inner,
+.cintillo-real-r7-inner,
+.cintillo-real-r8-inner{
+  border-bottom:0 !important;
+  box-shadow:none !important;
+  margin-bottom:0 !important;
+}
+
+/* La barra de navegación se pega al cintillo, sin línea superior. */
+.app-topline{
+  margin-top:0 !important;
+  border-top:0 !important;
+  background:rgba(255,255,255,.98) !important;
+  box-shadow:0 10px 26px rgba(34,53,72,.07) !important;
+}
+
+/* Mantener una sola separación elegante debajo de toda la cabecera. */
+.app-topline{
+  border-bottom:1px solid rgba(220,229,238,.72) !important;
+}
+
+/* Evita espacios visuales entre cintillo y menú. */
+.cintillo-oficial-r9 + .app-topline,
+.cintillo-oficial-r10 + .app-topline,
+.cintillo-oficial-r11 + .app-topline,
+.cintillo-real-r5 + .app-topline,
+.cintillo-real-r6 + .app-topline,
+.cintillo-real-r7 + .app-topline,
+.cintillo-real-r8 + .app-topline{
+  margin-top:0 !important;
+  border-top:0 !important;
+}
+
+/* Refinamiento visual de navegación institucional. */
+.app-main-nav a{
+  border-color:transparent !important;
+}
+
+.app-main-nav a.active{
+  background:var(--primary-soft) !important;
+  color:var(--primary-strong) !important;
+  border-color:rgba(128,0,32,.14) !important;
+}
+
+/* END_MB13E_R1_HEADER_INSTITUCIONAL_INTEGRADO */
