@@ -17,9 +17,10 @@ $msg = trim($_GET["msg"] ?? "");
 $err = trim($_GET["err"] ?? "");
 $okAsistencia = trim($_GET["ok_asistencia"] ?? "");
 $okEmpleadoId = (int)($_GET["empleado_id"] ?? 0);
-$okEstado = trim($_GET["estado"] ?? "");
+$okEstado = trim($_GET["ok_estado"] ?? "");
 $okHora = trim($_GET["hora"] ?? "");
 $okMinTarde = (int)($_GET["min_tarde"] ?? 0);
+$returnQuery = $_SERVER["QUERY_STRING"] ?? "";
 $okEmpleado = null;
 
 if ($okAsistencia !== "" && $okEmpleadoId > 0) {
@@ -988,12 +989,14 @@ if ($inicialFoto === "") {
               <form method="POST" action="../procesos/asistencia_entrada.php">
     <?php echo csrfInput(); ?>
                 <input type="hidden" name="empleado_id" value="<?php echo (int)$e["id"]; ?>">
+                <input type="hidden" name="return_query" value="<?php echo e($returnQuery); ?>">
                 <button class="mini in" type="submit" <?php echo $bloquear ? "disabled" : ""; ?>>Entrada</button>
               </form>
 
               <form method="POST" action="../procesos/asistencia_salida.php">
     <?php echo csrfInput(); ?>
                 <input type="hidden" name="empleado_id" value="<?php echo (int)$e["id"]; ?>">
+                <input type="hidden" name="return_query" value="<?php echo e($returnQuery); ?>">
                 <button class="mini out" type="submit" <?php echo $bloquear ? "disabled" : ""; ?>>Salida</button>
               </form>
             </div>

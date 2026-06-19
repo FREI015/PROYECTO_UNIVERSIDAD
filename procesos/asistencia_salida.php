@@ -4,17 +4,49 @@ require_once __DIR__ . "/../includes/funciones.php";
 requireLogin();
 require_once __DIR__ . "/../includes/conexion.php";
 
+$returnQuery = trim((string)($_POST["return_query"] ?? ""));
+
+function asistenciaReturnUrl(string $key, string $message, array $extra = []): string {
+  global $returnQuery;
+
+  $params = [];
+
+  if ($returnQuery !== "") {
+    parse_str($returnQuery, $params);
+
+    if (!is_array($params)) {
+      $params = [];
+    }
+  }
+
+  foreach (["msg", "err", "ok_asistencia", "empleado_id", "ok_estado", "hora", "min_tarde", "salida_estado", "min_salida_tardia"] as $k) {
+    unset($params[$k]);
+  }
+
+  $params[$key] = $message;
+
+  foreach ($extra as $k => $v) {
+    if ($v !== null && $v !== "") {
+      $params[$k] = $v;
+    }
+  }
+
+  $query = http_build_query($params);
+
+  return BASE_URL . "/modulos/asistencias.php" . ($query !== "" ? "?" . $query : "");
+}
+
 if ($_SERVER["REQUEST_METHOD"] !== "POST") {
-  header("Location: " . BASE_URL . "/modulos/asistencias.php?err=" . urlencode("Acceso inválido"));
+  header("Location: " . asistenciaReturnUrl("err", "Acceso inválido"));
   exit;
 }
 
-verifyCsrfOrRedirect(BASE_URL . "/modulos/asistencias.php?err=" . urlencode("Solicitud inválida. Intenta nuevamente."));
+verifyCsrfOrRedirect(asistenciaReturnUrl("err", "Solicitud inválida. Intenta nuevamente."));
 requirePermiso("marcar_asistencia", BASE_URL . "/modulos/asistencias.php");
 
 $empleado_id = (int)($_POST["empleado_id"] ?? 0);
 if ($empleado_id <= 0) {
-  header("Location: " . BASE_URL . "/modulos/asistencias.php?err=" . urlencode("Empleado inválido"));
+  header("Location: " . asistenciaReturnUrl("err", "Empleado inválido"));
   exit;
 }
 
@@ -35,17 +67,17 @@ $stmt->execute([$empleado_id]);
 $emp = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$emp) {
-  header("Location: " . BASE_URL . "/modulos/asistencias.php?err=" . urlencode("Empleado no existe"));
+  header("Location: " . asistenciaReturnUrl("err", "Empleado no existe"));
   exit;
 }
 
 if (strtoupper(trim((string)$emp["estado"])) !== "ACTIVO") {
-  header("Location: " . BASE_URL . "/modulos/asistencias.php?err=" . urlencode("Empleado no está ACTIVO"));
+  header("Location: " . asistenciaReturnUrl("err", "Empleado no está ACTIVO"));
   exit;
 }
 
 if (!puedeVerTurno($emp["turno_nombre"] ?? "")) {
-  header("Location: " . BASE_URL . "/modulos/asistencias.php?err=" . urlencode("No tienes permiso para marcar asistencia de este turno"));
+  header("Location: " . asistenciaReturnUrl("err", "No tienes permiso para marcar asistencia de este turno"));
   exit;
 }
 
@@ -73,12 +105,12 @@ $stmt->execute([$empleado_id, $fecha_asistencia]);
 $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$row || empty($row["hora_entrada"])) {
-  header("Location: " . BASE_URL . "/modulos/asistencias.php?err=" . urlencode("No tiene entrada registrada para esa fecha"));
+  header("Location: " . asistenciaReturnUrl("err", "No tiene entrada registrada para esa fecha"));
   exit;
 }
 
 if (!empty($row["hora_salida"])) {
-  header("Location: " . BASE_URL . "/modulos/asistencias.php?err=" . urlencode("Ya tiene salida registrada para esa fecha"));
+  header("Location: " . asistenciaReturnUrl("err", "Ya tiene salida registrada para esa fecha"));
   exit;
 }
 
@@ -97,7 +129,7 @@ if ($horaFin !== null) {
 $diffSec = $now->getTimestamp() - $inicio->getTimestamp();
 
 if ($diffSec < 0) {
-  header("Location: " . BASE_URL . "/modulos/asistencias.php?err=" . urlencode("La hora de salida no puede ser anterior a la entrada"));
+  header("Location: " . asistenciaReturnUrl("err", "La hora de salida no puede ser anterior a la entrada"));
   exit;
 }
 
@@ -162,14 +194,12 @@ if ($salidaEstado === "SALIDA_TARDIA") {
   $mensaje = "Salida registrada sin comparación de horario";
 }
 
-header(
-  "Location: " . BASE_URL .
-  "/modulos/asistencias.php?msg=" . urlencode($mensaje) .
-  "&ok_asistencia=salida" .
-  "&empleado_id=" . $empleado_id .
-  "&estado=" . urlencode((string)$row["estado"]) .
-  "&salida_estado=" . urlencode($salidaEstado) .
-  "&min_salida_tardia=" . urlencode((string)$minutosSalidaTardia) .
-  "&hora=" . urlencode($hora_now)
-);
+header("Location: " . asistenciaReturnUrl("msg", $mensaje, [
+  "ok_asistencia" => "salida",
+  "empleado_id" => $empleado_id,
+  "ok_estado" => (string)$row["estado"],
+  "salida_estado" => $salidaEstado,
+  "min_salida_tardia" => (string)$minutosSalidaTardia,
+  "hora" => $hora_now
+]));
 exit;

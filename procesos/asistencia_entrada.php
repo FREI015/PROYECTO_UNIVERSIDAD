@@ -4,17 +4,49 @@ require_once __DIR__ . "/../includes/funciones.php";
 requireLogin();
 require_once __DIR__ . "/../includes/conexion.php";
 
+$returnQuery = trim((string)($_POST["return_query"] ?? ""));
+
+function asistenciaReturnUrl(string $key, string $message, array $extra = []): string {
+  global $returnQuery;
+
+  $params = [];
+
+  if ($returnQuery !== "") {
+    parse_str($returnQuery, $params);
+
+    if (!is_array($params)) {
+      $params = [];
+    }
+  }
+
+  foreach (["msg", "err", "ok_asistencia", "empleado_id", "ok_estado", "hora", "min_tarde", "salida_estado", "min_salida_tardia"] as $k) {
+    unset($params[$k]);
+  }
+
+  $params[$key] = $message;
+
+  foreach ($extra as $k => $v) {
+    if ($v !== null && $v !== "") {
+      $params[$k] = $v;
+    }
+  }
+
+  $query = http_build_query($params);
+
+  return BASE_URL . "/modulos/asistencias.php" . ($query !== "" ? "?" . $query : "");
+}
+
 if ($_SERVER["REQUEST_METHOD"] !== "POST") {
-  header("Location: " . BASE_URL . "/modulos/asistencias.php?err=" . urlencode("Acceso inválido"));
+  header("Location: " . asistenciaReturnUrl("err", "Acceso inválido"));
   exit;
 }
 
-verifyCsrfOrRedirect(BASE_URL . "/modulos/asistencias.php?err=" . urlencode("Solicitud inválida. Intenta nuevamente."));
+verifyCsrfOrRedirect(asistenciaReturnUrl("err", "Solicitud inválida. Intenta nuevamente."));
 requirePermiso("marcar_asistencia", BASE_URL . "/modulos/asistencias.php");
 
 $empleado_id = (int)($_POST["empleado_id"] ?? 0);
 if ($empleado_id <= 0) {
-  header("Location: " . BASE_URL . "/modulos/asistencias.php?err=" . urlencode("Empleado inválido"));
+  header("Location: " . asistenciaReturnUrl("err", "Empleado inválido"));
   exit;
 }
 
@@ -42,18 +74,18 @@ $stmt->execute([$empleado_id]);
 $emp = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$emp) {
-  header("Location: " . BASE_URL . "/modulos/asistencias.php?err=" . urlencode("Empleado no existe"));
+  header("Location: " . asistenciaReturnUrl("err", "Empleado no existe"));
   exit;
 }
 
 $estadoEmp = strtoupper(trim((string)$emp["estado"]));
 if ($estadoEmp !== "ACTIVO") {
-  header("Location: " . BASE_URL . "/modulos/asistencias.php?err=" . urlencode("Empleado no está ACTIVO"));
+  header("Location: " . asistenciaReturnUrl("err", "Empleado no está ACTIVO"));
   exit;
 }
 
 if (!puedeVerTurno($emp["turno_nombre"] ?? "")) {
-    header("Location: " . BASE_URL . "/modulos/asistencias.php?err=" . urlencode("No tienes permiso para marcar asistencia de este turno"));
+    header("Location: " . asistenciaReturnUrl("err", "No tienes permiso para marcar asistencia de este turno"));
     exit;
 }
 // Modo emergencia: omite restricciones de reposo y permiso.
@@ -64,14 +96,14 @@ if (!$modoEmergencia) {
   $stmt = $pdo->prepare("SELECT id FROM reposos WHERE empleado_id=? AND estado='ACTIVO' AND ? BETWEEN fecha_inicio AND fecha_fin LIMIT 1");
   $stmt->execute([$empleado_id, $hoy_real]);
   if ($stmt->fetch()) {
-    header("Location: " . BASE_URL . "/modulos/asistencias.php?err=" . urlencode("No puedes marcar: reposo activo"));
+    header("Location: " . asistenciaReturnUrl("err", "No puedes marcar: reposo activo"));
     exit;
   }
 
   $stmt = $pdo->prepare("SELECT id FROM permisos WHERE empleado_id=? AND estado='ACTIVO' AND ? BETWEEN fecha_inicio AND fecha_fin LIMIT 1");
   $stmt->execute([$empleado_id, $hoy_real]);
   if ($stmt->fetch()) {
-    header("Location: " . BASE_URL . "/modulos/asistencias.php?err=" . urlencode("No puedes marcar: permiso activo"));
+    header("Location: " . asistenciaReturnUrl("err", "No puedes marcar: permiso activo"));
     exit;
   }
 }
@@ -120,7 +152,7 @@ if (defined("ASISTENCIA_MARGEN_ANTES_MINUTOS")) {
 $inicioPermitido = $inicioTurno->modify("-" . $margenAntesMin . " minutes");
 
 if ($now->getTimestamp() < $inicioPermitido->getTimestamp()) {
-    header("Location: " . BASE_URL . "/modulos/asistencias.php?err=" . urlencode("Aun no esta dentro del margen permitido para marcar entrada"));
+    header("Location: " . asistenciaReturnUrl("err", "Aun no esta dentro del margen permitido para marcar entrada"));
     exit;
 }
 
@@ -140,7 +172,7 @@ $stmt->execute([$empleado_id, $fecha_asistencia]);
 $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if ($row && !empty($row["hora_entrada"])) {
-  header("Location: " . BASE_URL . "/modulos/asistencias.php?err=" . urlencode("Ya tiene entrada registrada para esa fecha"));
+  header("Location: " . asistenciaReturnUrl("err", "Ya tiene entrada registrada para esa fecha"));
   exit;
 }
 
@@ -155,6 +187,12 @@ if ($row) {
   $ins->execute([$empleado_id, $fecha_asistencia, $estado, $hora_now, $min_tarde, $registrado_por]);
 }
 
-header("Location: " . BASE_URL . "/modulos/asistencias.php?msg=" . urlencode("Asistencia guardada con éxito") . "&ok_asistencia=entrada&empleado_id=" . $empleado_id . "&estado=" . urlencode($estado) . "&hora=" . urlencode($hora_now) . "&min_tarde=" . $min_tarde);
+header("Location: " . asistenciaReturnUrl("msg", "Asistencia guardada con éxito", [
+  "ok_asistencia" => "entrada",
+  "empleado_id" => $empleado_id,
+  "ok_estado" => $estado,
+  "hora" => $hora_now,
+  "min_tarde" => $min_tarde
+]));
 exit;
 
