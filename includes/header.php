@@ -12,7 +12,7 @@ $usuario = $_SESSION["user"]["usuario"] ?? "Usuario";
 $rol     = $_SESSION["user"]["rol"] ?? "—";
 $inicial = strtoupper(mb_substr((string)$usuario, 0, 1, "UTF-8"));
 
-$logo = BASE_URL . "/assets/img/logo_institucion.png";
+$logo = BASE_URL . "/assets/img/insignia.png";
 $logoutUrl = BASE_URL . "/procesos/logout.php";
 ?>
 <!DOCTYPE html>

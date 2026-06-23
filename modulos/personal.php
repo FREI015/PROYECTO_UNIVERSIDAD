@@ -23,6 +23,7 @@ if ($okPersonal !== "" && $okEmpleadoId > 0) {
       e.cedula,
       e.estado,
       e.foto_archivo,
+      e.codigo_barra,
       c.nombre AS cargo,
       t.nombre AS turno
     FROM empleados e
@@ -113,7 +114,7 @@ if ($orden === "jerarquia") {
 }
 
 $personal = $pdo->prepare("
-  SELECT e.id, e.cedula, e.estado,
+  SELECT e.id, e.cedula, e.estado, e.codigo_barra,
          CONCAT(
            UCASE(LEFT(TRIM(e.nombres),1)), SUBSTRING(TRIM(e.nombres),2), ' ',
            UCASE(LEFT(TRIM(e.apellidos),1)), SUBSTRING(TRIM(e.apellidos),2)
@@ -345,6 +346,7 @@ require_once __DIR__ . "/../includes/header.php";
     $okCargo = $okEmpleado["cargo"] ?? "-";
     $okTurno = $okEmpleado["turno"] ?? "-";
     $okEstadoEmpleado = trim((string)($okEmpleado["estado"] ?? "ACTIVO"));
+    $okCodigoBarra = $okEmpleado["codigo_barra"] ?? "";
   ?>
 
   <div class="personal-success-card" id="personalSuccessCard">
@@ -362,6 +364,7 @@ require_once __DIR__ . "/../includes/header.php";
           Cedula: <?php echo e(formatCedula($okCedula)); ?> |
           Cargo: <?php echo e($okCargo); ?> |
           Turno: <?php echo e($okTurno); ?><br>
+          C&oacute;digo de Barras: <strong><?php echo e($okCodigoBarra ?: "—"); ?></strong> |
           Estado del empleado: <?php echo e($okEstadoEmpleado); ?>
         <?php else: ?>
           Registro guardado. No se pudo cargar el resumen completo del empleado.
@@ -473,7 +476,8 @@ require_once __DIR__ . "/../includes/header.php";
       <thead>
         <tr>
           <th>Nombre</th>
-          <th>Cédula</th>
+          <th>C&eacute;dula</th>
+          <th>C&oacute;digo de Barras</th>
           <th>Cargo</th>
           <th>Turno</th>
           <th>Estado</th>
@@ -482,13 +486,15 @@ require_once __DIR__ . "/../includes/header.php";
       </thead>
       <tbody>
         <?php if (!$personal): ?>
-          <tr><td colspan="6">No hay personal registrado.</td></tr>
+          <tr><td colspan="7">No hay personal registrado.</td></tr>
         <?php endif; ?>
 
         <?php foreach ($personal as $p): ?>
+          <?php $codigoBarra = $p["codigo_barra"] ?? ""; ?>
           <tr>
             <td><?php echo e($p["nombre"]); ?></td>
             <td><?php echo e(formatCedula($p["cedula"])); ?></td>
+            <td><code style="font-size:13px;font-weight:700;letter-spacing:1px"><?php echo e($codigoBarra ?: "—"); ?></code></td>
             <td><?php echo e($p["cargo"]); ?></td>
             <td><?php echo e($p["turno"] ?: "—"); ?></td>
             <td>

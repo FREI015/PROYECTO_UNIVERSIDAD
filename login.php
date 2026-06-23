@@ -14,7 +14,7 @@ $err  = trim($_GET["err"] ?? "");
 $next = safeNext($_GET["next"] ?? "", BASE_URL . "/modulos/asistencias.php");
 
 $ACTION = BASE_URL . "/procesos/login_procesar.php";
-$logo   = BASE_URL . "/assets/img/logo_institucion.png";
+$logo   = BASE_URL . "/assets/img/insignia.png";
 
 $fondoRel  = "/assets/img/login/fondo_login_institucional.jpeg";
 $fondoPath = __DIR__ . $fondoRel;
@@ -402,6 +402,9 @@ require_once __DIR__ . "/includes/cintillo_institucional.php";
         </div>
       </div>
 
+      <div style="text-align:center;margin-top:16px">
+        <a href="<?php echo e(BASE_URL); ?>/index.php" style="display:inline-block;padding:12px 14px;border-radius:16px;border:1px solid #d2c4ad;background:#faf7ef;color:#334155;font-size:13px;font-weight:900;text-decoration:none;transition:background .15s ease,border-color .15s ease">Volver al inicio</a>
+      </div>
     </section>
 
     <div class="login-light-footer">

@@ -297,3 +297,16 @@ function usuarioPuedeAccederModuloUsuarios(): bool {
   return puedeAdministrarUsuarios();
 }
 
+function empleadoPorCodigoBarra(PDO $pdo, string $codigo): ?array {
+  $codigo = trim($codigo);
+  if ($codigo === "") return null;
+  $stmt = $pdo->prepare("SELECT id, nombres, apellidos, cedula, codigo_barra FROM empleados WHERE codigo_barra = ? LIMIT 1");
+  $stmt->execute([$codigo]);
+  $emp = $stmt->fetch(PDO::FETCH_ASSOC);
+  return $emp ?: null;
+}
+
+function generarCodigoBarra(int $empleadoId): string {
+  return 'EMP' . str_pad((string)$empleadoId, 5, '0', STR_PAD_LEFT);
+}
+

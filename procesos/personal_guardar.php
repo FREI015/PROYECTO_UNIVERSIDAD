@@ -126,6 +126,10 @@ try {
 
   $nuevoEmpleadoId = (int)$pdo->lastInsertId();
 
+  $codigoBarra = generarCodigoBarra($nuevoEmpleadoId);
+  $upd = $pdo->prepare("UPDATE empleados SET codigo_barra = ? WHERE id = ? AND codigo_barra IS NULL");
+  $upd->execute([$codigoBarra, $nuevoEmpleadoId]);
+
   $pdo->commit();
 
   header("Location: " . BASE_URL . "/modulos/personal.php?msg=" . urlencode("Personal registrado exitosamente") . "&ok_personal=1&empleado_id=" . $nuevoEmpleadoId);

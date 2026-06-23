@@ -1,6 +1,121 @@
 <?php
 require_once __DIR__ . "/includes/config.php";
 require_once __DIR__ . "/includes/funciones.php";
+
+if (!isLogged()):
+$pageTitle = "Sistema de Control de Asistencia";
+?><!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title><?php echo e($pageTitle); ?></title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif}
+    body{
+      background:linear-gradient(135deg,#0b6efd 0%,#1a4fa0 100%);
+      min-height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .landing{
+      background:#ffffff;
+      border-radius:32px;
+      padding:48px 40px;
+      max-width:520px;
+      width:90%;
+      text-align:center;
+      box-shadow:0 20px 60px rgba(0,0,0,.20);
+    }
+    .landing-logo{
+      width:90px;
+      height:90px;
+      object-fit:contain;
+      margin-bottom:16px;
+      border-radius:20px;
+      background:#f3f6fb;
+      padding:12px;
+    }
+    .landing h1{
+      font-size:24px;
+      font-weight:950;
+      color:#111827;
+      margin-bottom:8px;
+    }
+    .landing p{
+      color:#6b7280;
+      font-size:14px;
+      line-height:1.5;
+      margin-bottom:32px;
+    }
+    .landing-buttons{
+      display:flex;
+      flex-direction:column;
+      gap:14px;
+    }
+    .landing-btn{
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      gap:10px;
+      padding:16px 20px;
+      border-radius:16px;
+      font-size:16px;
+      font-weight:900;
+      text-decoration:none;
+      transition:transform .08s ease,box-shadow .15s ease;
+    }
+    .landing-btn:hover{
+      transform:translateY(-2px);
+      box-shadow:0 8px 20px rgba(0,0,0,.10);
+    }
+    .landing-btn:active{
+      transform:translateY(0);
+    }
+    .landing-btn-primary{
+      background:#0b6efd;
+      color:#fff;
+    }
+    .landing-btn-secondary{
+      background:#f3f6fb;
+      color:#111827;
+      border:1px solid #e9edf4;
+    }
+    .landing-footer{
+      margin-top:28px;
+      font-size:12px;
+      color:#9ca3af;
+    }
+    @media(max-width:480px){
+      .landing{padding:32px 24px}
+      .landing h1{font-size:20px}
+    }
+  </style>
+</head>
+<body>
+  <div class="landing">
+    <img class="landing-logo" src="<?php echo e(BASE_URL); ?>/assets/img/insignia.png" alt="Logo institucional">
+    <h1>Control de Asistencia</h1>
+    <p>Bienvenido al sistema de registro y control de asistencia del personal.</p>
+    <div class="landing-buttons">
+      <a class="landing-btn landing-btn-primary" href="<?php echo e(BASE_URL); ?>/login.php">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+        Acceso Administrativo
+      </a>
+      <a class="landing-btn landing-btn-secondary" href="<?php echo e(BASE_URL); ?>/login_empleado.php">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        Registrar Asistencia
+      </a>
+    </div>
+    <div class="landing-footer">Sistema de Control de Asistencia - E.B.N. Dr. Enrique Delgado Palacios</div>
+  </div>
+</body>
+</html>
+<?php
+exit;
+endif;
+
 requireLogin();
 require_once __DIR__ . "/includes/conexion.php";
 
