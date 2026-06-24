@@ -70,3 +70,6 @@ includes/conexion.php
 # Respaldos locales
 # Mantener ejemplo de conexion versionable
 !conexion.example.php
+# Permitir archivos de seguridad dentro de uploads
+!uploads/.htaccess
+!uploads/empleados/.htaccess
