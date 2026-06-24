@@ -63,3 +63,10 @@ uploads/empleados/*
 !uploads/empleados/.gitkeep
 # Backups locales de base de datos
 backups/
+# Auditorias locales generadas durante revision senior
+_auditoria_senior/
+# Conexion local con credenciales reales
+includes/conexion.php
+# Respaldos locales
+# Mantener ejemplo de conexion versionable
+!conexion.example.php
