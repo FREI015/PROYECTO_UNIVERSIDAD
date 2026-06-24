@@ -203,7 +203,6 @@ $logoutUrl = BASE_URL . "/procesos/logout.php";
 ?>
 
 <?php
-// MB13B-R2-CINTILLO-HEADER-INCLUDE
 require_once __DIR__ . '/cintillo_institucional.php';
 ?>
 <header class="app-topline">

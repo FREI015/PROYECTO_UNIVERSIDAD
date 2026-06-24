@@ -31,9 +31,6 @@ $theme = BASE_URL . "/assets/css/app-theme.css?v=login-13d-r6";
 <link rel="stylesheet" href="<?php echo e($theme); ?>">
 
 <style>
-/* ============================================================
-   MB13D-R3 - LOGIN CLARO DE UN SOLO PANEL
-   ============================================================ */
 
 html,
 body{
@@ -329,7 +326,6 @@ body{
   }
 }
 
-/* FIN MB13D-R3 */
 </style>
 </head>
 

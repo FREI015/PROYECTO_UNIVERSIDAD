@@ -4,9 +4,6 @@ $cintilloFinal = BASE_URL . "/assets/img/institucional/cintillo_institucional_fi
 ?>
 
 <style>
-  /* ============================================================
-   MB13E-R6 - CINTILLO FINAL EN IMAGEN CENTRADO
-   ============================================================ */
 
   .cintillo-final-r6 {
     width: 100%;
@@ -51,7 +48,6 @@ $cintilloFinal = BASE_URL . "/assets/img/institucional/cintillo_institucional_fi
     border-top: 0 !important;
   }
 
-  /* FIN MB13E-R6 */
 </style>
 
 <div class="cintillo-final-r6" role="banner" aria-label="Cintillo institucional">

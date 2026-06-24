@@ -114,7 +114,6 @@ if (isset($_FILES["foto"]) && is_array($_FILES["foto"]) && (int)($_FILES["foto"]
 
     $fotoArchivo = "uploads/empleados/" . $nombreArchivo;
 }
-// MB5C: registro seguro de personal con transaccion y limpieza de foto si falla la DB.
 try {
   $pdo->beginTransaction();
 

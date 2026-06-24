@@ -65,7 +65,6 @@ try {
   if ($accion === "suspender") $nuevo = "SUSPENDIDO";
   if ($accion === "retirar")   $nuevo = "RETIRADO";
 
-  // MB5C: actualizar estado limpio usando columnas reales de baja.
   if ($accion === "retirar") {
     $upd = $pdo->prepare("UPDATE empleados SET estado=?, condicion_baja=?, fecha_baja=CURDATE() WHERE id=?");
     $upd->execute([$nuevo, $condicion !== "" ? $condicion : null, $id]);
