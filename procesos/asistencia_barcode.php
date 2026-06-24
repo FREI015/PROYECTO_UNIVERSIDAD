@@ -1,11 +1,26 @@
-<?php
+﻿<?php
 require_once __DIR__ . "/../includes/config.php";
 require_once __DIR__ . "/../includes/funciones.php";
 require_once __DIR__ . "/../includes/conexion.php";
 
 $redirect_to = trim($_POST["redirect_to"] ?? "");
 $redirect_default = BASE_URL . "/modulos/asistencias.php";
-$redirect_url = $redirect_to !== "" ? $redirect_to : $redirect_default;
+function barcode_resolve_redirect(string $redirect_to, string $redirect_default): string {
+  $value = trim($redirect_to);
+  $kioskUrl = BASE_URL . "/login_empleado.php";
+
+  if ($value === "") {
+    return $redirect_default;
+  }
+
+  if ($value === $kioskUrl || $value === "/login_empleado.php" || $value === "login_empleado.php") {
+    return $kioskUrl;
+  }
+
+  return $redirect_default;
+}
+
+$redirect_url = barcode_resolve_redirect($redirect_to, $redirect_default);
 
 function barcode_redirect($url, $params = []) {
   global $redirect_url;
@@ -24,24 +39,51 @@ function barcode_err($msg) {
 }
 
 if ($_SERVER["REQUEST_METHOD"] !== "POST") {
-  barcode_err("Acceso inválido");
+  barcode_err("Acceso invÃ¡lido");
 }
 
-$es_kiosko = ($redirect_to !== "");
+$csrf_redirect_url = $redirect_url . (strpos($redirect_url, "?") === false ? "?" : "&") . "barcode_msg=" . urlencode("Solicitud invalida. Intenta nuevamente.") . "&barcode_type=error";
+verifyCsrfOrRedirect($csrf_redirect_url);
+$es_kiosko = ($redirect_url === BASE_URL . "/login_empleado.php");
+if ($es_kiosko) {
+  $ahoraRate = time();
+  $ventanaRate = $ahoraRate - 60;
+  $historialIntentos = $_SESSION["kiosk_barcode_rate"] ?? [];
+
+  if (!is_array($historialIntentos)) {
+    $historialIntentos = [];
+  }
+
+  $intentosRecientes = [];
+  foreach ($historialIntentos as $tsIntento) {
+    $tsIntento = (int)$tsIntento;
+    if ($tsIntento >= $ventanaRate) {
+      $intentosRecientes[] = $tsIntento;
+    }
+  }
+
+  if (count($intentosRecientes) >= 20) {
+    barcode_err("Demasiados intentos. Espera un minuto.");
+  }
+
+  $intentosRecientes[] = $ahoraRate;
+  $_SESSION["kiosk_barcode_rate"] = $intentosRecientes;
+}
+
 if ($redirect_to === "") {
   requireLogin();
-  verifyCsrfOrRedirect($redirect_default . "?err=" . urlencode("Solicitud inválida. Intenta nuevamente."));
+  verifyCsrfOrRedirect($redirect_default . "?err=" . urlencode("Solicitud invÃ¡lida. Intenta nuevamente."));
   requirePermiso("marcar_asistencia", $redirect_default);
 }
 
 $codigo_barra = trim($_POST["codigo_barra"] ?? "");
 if ($codigo_barra === "") {
-  barcode_err("Código de barras vacío");
+  barcode_err("CÃ³digo de barras vacÃ­o");
 }
 
 $empleado = empleadoPorCodigoBarra($pdo, $codigo_barra);
 if (!$empleado) {
-  barcode_err("No se encontró un empleado con ese código de barras");
+  barcode_err("No se encontrÃ³ un empleado con ese cÃ³digo de barras");
 }
 
 $empleado_id = (int)$empleado["id"];
@@ -58,7 +100,7 @@ if (!$emp) {
 }
 
 if (strtoupper(trim((string)$emp["estado"])) !== "ACTIVO") {
-  barcode_err("El empleado no está ACTIVO");
+  barcode_err("El empleado no estÃ¡ ACTIVO");
 }
 
 if (!$es_kiosko && !puedeVerTurno($emp["turno_nombre"] ?? "")) {
@@ -174,5 +216,6 @@ if (!$asistencia || empty($asistencia["hora_entrada"])) {
   ]);
 
 } else {
-  barcode_err("Ya registró entrada y salida hoy");
+  barcode_err("Ya registrÃ³ entrada y salida hoy");
 }
+

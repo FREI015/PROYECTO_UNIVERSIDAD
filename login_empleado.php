@@ -265,6 +265,7 @@ try {
     <div class="kiosk-scanner">
       <label>C&oacute;digo de Barras</label>
       <form class="kiosk-input-wrap" method="POST" action="<?php echo e(BASE_URL); ?>/procesos/asistencia_barcode.php" id="kioskForm">
+        <?php echo csrfInput(); ?>
         <input type="hidden" name="redirect_to" value="<?php echo e(BASE_URL); ?>/login_empleado.php">
         <input type="text" name="codigo_barra" id="kioskInput" class="kiosk-input"
                placeholder="Escanea o escribe el c&oacute;digo..." autocomplete="off" autofocus inputmode="text">
