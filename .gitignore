@@ -61,3 +61,5 @@ _fixes/
 # Archivos subidos por usuarios / datos generados
 uploads/empleados/*
 !uploads/empleados/.gitkeep
+# Backups locales de base de datos
+backups/
