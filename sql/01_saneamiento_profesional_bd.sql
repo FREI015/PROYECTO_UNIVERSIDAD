@@ -217,6 +217,8 @@ CALL add_index_if_missing('usuarios', 'idx_usuarios_rol_estado', 'ALTER TABLE us
 
 CALL drop_fk_if_exists('empleados', 'fk_empleado_cargo');
 CALL drop_fk_if_exists('empleados', 'fk_empleado_turno');
+CALL drop_fk_if_exists('empleados', 'empleados_ibfk_1');
+CALL drop_fk_if_exists('empleados', 'empleados_ibfk_2');
 CALL drop_fk_if_exists('asistencias', 'fk_asistencia_empleado');
 CALL drop_fk_if_exists('asistencias', 'fk_asistencia_usuario');
 CALL drop_fk_if_exists('permisos', 'fk_permiso_empleado');
@@ -311,3 +313,4 @@ ORDER BY COLUMN_NAME;
 SELECT id, usuario, rol, estado
 FROM usuarios
 ORDER BY id;
+
