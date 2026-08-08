@@ -24,16 +24,18 @@ CREATE TABLE IF NOT EXISTS empleados (
   nombres VARCHAR(80) NOT NULL,
   apellidos VARCHAR(80) NOT NULL,
   telefono VARCHAR(20) NULL,
+  codigo_barra VARCHAR(50) NULL,
   cargo_id INT NOT NULL,
   tipo_contrato ENUM('HORA','TURNO') NOT NULL DEFAULT 'TURNO',
   turno_id INT NULL,
-  jerarquia INT NOT NULL DEFAULT 999,
+  jerarquia INT NOT NULL DEFAULT 5,
   foto_archivo VARCHAR(255) NULL,
   estado ENUM('ACTIVO','SUSPENDIDO','RETIRADO') NOT NULL DEFAULT 'ACTIVO',
   condicion_baja VARCHAR(120) NULL,
   fecha_baja DATE NULL,
   creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   actualizado_en TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_empleados_codigo_barra (codigo_barra),
   CONSTRAINT fk_empleado_cargo FOREIGN KEY (cargo_id) REFERENCES cargos(id),
   CONSTRAINT fk_empleado_turno FOREIGN KEY (turno_id) REFERENCES turnos(id)
 ) ENGINE=InnoDB;
@@ -103,3 +105,18 @@ INSERT IGNORE INTO turnos (id, nombre, hora_inicio, hora_fin) VALUES
 (1, 'MATUTINO', '07:00:00', '12:00:00'),
 (2, 'VESPERTINO', '13:00:00', '17:00:00'),
 (3, 'COMPLETO', '07:00:00', '17:00:00');
+
+INSERT IGNORE INTO cargos (nombre, descripcion) VALUES
+('DOCENTE', 'Personal docente'),
+('ADMINISTRATIVO', 'Personal administrativo'),
+('OBRERO', 'Personal obrero'),
+('DIRECTIVO', 'Personal directivo');
+
+-- Usuario administrador inicial (clave: admin)
+INSERT IGNORE INTO usuarios (usuario, clave, rol, estado) VALUES
+('admin', '$2y$12$SsPXfsZtjLXq0cS0NkfF/OddV1RikJbkG5VETWVcb.SCio6Q.qseu', 'SUPER', 'ACTIVO');
+
+-- Codigo de barras inicial para empleados existentes (formato EMP + id de 5 digitos)
+UPDATE empleados
+SET codigo_barra = CONCAT('EMP', LPAD(id, 5, '0'))
+WHERE codigo_barra IS NULL OR TRIM(codigo_barra) = '';

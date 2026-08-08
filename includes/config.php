@@ -2,9 +2,37 @@
 // includes/config.php
 // Base del proyecto: sesión + constantes de rutas
 
+// Configuración de timeout de sesión (producción)
+ini_set('session.gc_maxlifetime', 3600);
+ini_set('session.use_strict_mode', 1);
+ini_set('session.use_only_cookies', 1);
+session_set_cookie_params([
+  'lifetime' => 0,
+  'path'     => '/',
+  'domain'   => '',
+  'secure'   => (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'),
+  'httponly' => true,
+  'samesite' => 'Strict',
+]);
+
 if (session_status() !== PHP_SESSION_ACTIVE) {
   session_start();
 }
+
+// Verificar expiración por inactividad (30 min = 1800 seg)
+$tiempoMaximoInactividad = 1800;
+if (!empty($_SESSION['_ultimo_acceso'])) {
+  $inactividad = time() - $_SESSION['_ultimo_acceso'];
+  if ($inactividad > $tiempoMaximoInactividad) {
+    $_SESSION = [];
+    session_unset();
+    session_destroy();
+    $redirect = (isset($_SERVER['REQUEST_URI']) ? '?next=' . urlencode($_SERVER['REQUEST_URI']) : '');
+    header('Location: ' . ($BASE_PATH ?? '/') . '/login.php' . $redirect);
+    exit;
+  }
+}
+$_SESSION['_ultimo_acceso'] = time();
 
 // Establecer la zona horaria de Caracas
 date_default_timezone_set("America/Caracas");

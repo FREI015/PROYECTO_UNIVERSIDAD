@@ -11,7 +11,7 @@
   - cargos base iniciales.
   - indices para consultas frecuentes.
   - relaciones protegidas para no borrar historial.
-  - trigger para codigos de barra profesionales.
+  - trigger para codigos de barra secuenciales (formato EMP + id, 5 digitos).
 */
 
 CREATE DATABASE IF NOT EXISTS control_asistencia
@@ -35,7 +35,7 @@ INSERT IGNORE INTO cargos (nombre, descripcion) VALUES
 ('DIRECTIVO', 'Personal directivo');
 
 INSERT IGNORE INTO usuarios (usuario, clave, rol, estado) VALUES
-('admin', '$2y$12$VFZ9izwGmucwb/TckYrWxO9qBvNzi1wEsokXOF7nILqM4KqDnpmum', 'SUPER', 'ACTIVO');
+('admin', '$2y$12$SsPXfsZtjLXq0cS0NkfF/OddV1RikJbkG5VETWVcb.SCio6Q.qseu', 'SUPER', 'ACTIVO');
 
 DELIMITER $$
 
@@ -167,9 +167,10 @@ WHERE codigo_barra IS NOT NULL
   AND TRIM(codigo_barra) = '';
 
 UPDATE empleados
-SET codigo_barra = CONCAT('EMP-', UPPER(SUBSTRING(REPLACE(UUID(), '-', ''), 1, 12)))
+SET codigo_barra = CONCAT('EMP', LPAD(id, 5, '0'))
 WHERE codigo_barra IS NULL
-   OR codigo_barra REGEXP '^EMP[0-9]{5}$';
+   OR TRIM(codigo_barra) = ''
+   OR codigo_barra REGEXP '^EMP-';
 
 UPDATE empleados e
 JOIN (
@@ -188,7 +189,7 @@ JOIN (
     WHERE e1.id <> repetidos.id_conservar
   ) x
 ) d ON d.id = e.id
-SET e.codigo_barra = CONCAT('EMP-', UPPER(SUBSTRING(REPLACE(UUID(), '-', ''), 1, 12)));
+SET e.codigo_barra = CONCAT('EMP', LPAD(e.id, 5, '0'));
 
 CALL add_unique_single_column_if_missing(
   'empleados',
@@ -283,7 +284,7 @@ BEFORE INSERT ON empleados
 FOR EACH ROW
 BEGIN
   IF NEW.codigo_barra IS NULL OR TRIM(NEW.codigo_barra) = '' THEN
-    SET NEW.codigo_barra = CONCAT('EMP-', UPPER(SUBSTRING(REPLACE(UUID(), '-', ''), 1, 12)));
+    SET NEW.codigo_barra = CONCAT('EMP', LPAD(COALESCE((SELECT MAX(id) + 1 FROM empleados), 1), 5, '0'));
   END IF;
 END$$
 

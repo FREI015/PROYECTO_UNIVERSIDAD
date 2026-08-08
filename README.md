@@ -37,12 +37,15 @@ Sistema web para la gestion de asistencia, personal, permisos, reposos, usuarios
 
 1. Clonar el repositorio.
 2. Colocar el proyecto en el directorio web local, por ejemplo C:\xampp\htdocs\control_asistencia.
-3. Crear la base de datos control_asistencia.
-4. Importar los archivos SQL desde la carpeta sql/.
-5. Copiar conexion.example.php como includes/conexion.php.
-6. Ajustar credenciales locales en includes/conexion.php.
-7. Iniciar Apache y MySQL.
-8. Abrir http://localhost/control_asistencia/login.php.
+3. Importar la base de datos desde la carpeta sql/:
+   - **Instalación con datos (recomendada):** importar `control_asistencia_completa.sql`. Es un volcado autocontenido que crea la BD y restaura todos los datos (empleados, asistencias, permisos, reposos y usuarios).
+   - **Instalación limpia (solo esquema):** importar `bd.sql` y luego, opcionalmente, `01_saneamiento_profesional_bd.sql`.
+4. Copiar conexion.example.php como includes/conexion.php.
+5. Ajustar credenciales locales en includes/conexion.php.
+6. Iniciar Apache y MySQL.
+7. Abrir http://localhost/control_asistencia/login.php.
+
+> Nota: `01_saneamiento_profesional_bd.sql` usa `DELIMITER` y crea procedimientos/trigger, por lo que debe ejecutarse en MySQL/MariaDB (no en SQLite) y con privilegios de base de datos. El volcado `control_asistencia_completa.sql` no depende de esos procedimientos.
 
 ## Configuracion local
 
