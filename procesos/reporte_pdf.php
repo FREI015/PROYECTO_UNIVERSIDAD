@@ -179,9 +179,9 @@ function reportePdfAgregarCintillo(TCPDF $pdf): void {
 
   $pdf->SetY(8);
   $pdf->SetFont("helvetica", "", 8);
-  $pdf->Cell(0, 4, "Ministerio del Poder Popular para la EducaciÃ³n", 0, 1, "C");
+  $pdf->Cell(0, 4, "Ministerio del Poder Popular para la EducaciÓn", 0, 1, "C");
   $pdf->SetFont("helvetica", "B", 14);
-  $pdf->Cell(0, 6, "EDUCACIÃ“N", 0, 1, "C");
+  $pdf->Cell(0, 6, "EDUCACIÓN", 0, 1, "C");
   $pdf->SetFont("helvetica", "B", 7);
   $pdf->Cell(0, 4, "E.B.N Dr. Enrique Delgado Palacios   CIRCUITO LONGARAY   Cod. Plantel OD723101   Cod. Institucional 00673395   RIF 305187355", 0, 1, "C");
   $pdf->Ln(4);
@@ -249,7 +249,7 @@ function rangeFromPeriodo(string $periodo, string $fechaBase): array {
     return [$desde, $hasta, $label];
   }
 
-  // PERSONALIZADO (si no pasan desde/hasta caerÃ¡ al mes)
+  // PERSONALIZADO (si no pasan desde/hasta caerá al mes)
   $start = (clone $dt)->modify("first day of this month");
   $end   = (clone $dt)->modify("last day of this month");
   $desde = $start->format("Y-m-d");
@@ -404,7 +404,7 @@ foreach ($empIds as $id) {
   foreach ($dates as $d) {
     $statusMap[$id][$d] = [
       'estado' => 'AUSENTE',
-      'detalle' => 'Sin justificaciÃ³n',
+      'detalle' => 'Sin justificaciÓn',
       'minutos_tarde' => 0
     ];
   }
@@ -472,7 +472,7 @@ foreach ($asisRows as $a) {
   $detalleSalida = "";
 
   if ($salidaEstado === "SALIDA_TARDIA" || $minSalidaTardia > 0) {
-    $detalleSalida = " | Salida tardÃ­a" . ($minSalidaTardia > 0 ? " ({$minSalidaTardia} min)" : "");
+    $detalleSalida = " | Salida tardía" . ($minSalidaTardia > 0 ? " ({$minSalidaTardia} min)" : "");
   } elseif ($obsSalida !== "" && $salidaEstado !== "NORMAL") {
     $detalleSalida = " | " . $obsSalida;
   }
@@ -494,7 +494,7 @@ foreach ($asisRows as $a) {
     ];
   } else {
     $estadoDia = $detalleSalida !== "" ? "SALIDA_TARDIA" : "A_TIEMPO";
-    $detalleDia = $detalleSalida !== "" ? "AsistiÃ³ a tiempo" . $detalleSalida : "AsistiÃ³ a tiempo";
+    $detalleDia = $detalleSalida !== "" ? "AsistiÓ a tiempo" . $detalleSalida : "AsistiÓ a tiempo";
 
     $statusMap[$eid][$f] = [
       "estado" => $estadoDia,
@@ -504,7 +504,7 @@ foreach ($asisRows as $a) {
   }
 }
 
-// 4) EstadÃ­sticas
+// 4) Estadísticas
 $sumGlobal = [
   'empleados' => count($empleados),
   'dias' => count($dates),
@@ -552,7 +552,7 @@ foreach ($empleados as $emp) {
         'fecha' => $d,
         'cedula' => $emp["cedula"],
         'empleado' => $nombre,
-        'turno' => $emp["turno"] ?? "â€”",
+        'turno' => $emp["turno"] ?? "-",
         'estado' => $st,
         'detalle' => $statusMap[$eid][$d]['detalle'],
       ];
@@ -563,7 +563,7 @@ foreach ($empleados as $emp) {
     'cedula' => $emp["cedula"],
     'empleado' => $nombre,
     'cargo' => $emp["cargo"],
-    'turno' => $emp["turno"] ?? "â€”",
+    'turno' => $emp["turno"] ?? "-",
     'asistio' => $cnt['asistio'],
     'a_tiempo' => $cnt['a_tiempo'],
     'retardo' => $cnt['retardo'],
@@ -609,7 +609,7 @@ $pdf->SetFont("helvetica", "", 10);
 $generado = date("Y-m-d H:i");
 $turnoTxt = ($turnoId === null) ? "Todos" : ("Turno ID: " . $turnoId);
 
-// TÃ­tulo y nombre del archivo para reporte individual.
+// Título y nombre del archivo para reporte individual.
 $tituloReporte = "Reporte de Asistencia - " . $label;
 $filename = "reporte_{$desde}_{$hasta}.pdf";
 
@@ -637,13 +637,13 @@ $html = '
   Generado: '.$generado.'<br>
   Rango: <strong>'.$desde.'</strong> al <strong>'.$hasta.'</strong><br>
   Turno: '.$turnoTxt.'<br>
-  Empleados: <strong>'.$sumGlobal["empleados"].'</strong> | DÃ­as en rango: <strong>'.$sumGlobal["dias"].'</strong>
+  Empleados: <strong>'.$sumGlobal["empleados"].'</strong> | Días en rango: <strong>'.$sumGlobal["dias"].'</strong>
 </div>
 
 <div class="box">
   <table>
     <tr>
-      <th>Total AsistiÃ³</th><th>A tiempo</th><th>Retardos</th><th>Salidas tardÃ­as</th><th>Permisos</th><th>Reposos</th><th>Ausencias</th>
+      <th>Total AsistiÓ</th><th>A tiempo</th><th>Retardos</th><th>Salidas tardías</th><th>Permisos</th><th>Reposos</th><th>Ausencias</th>
     </tr>
     <tr>
       <td>'.$sumGlobal["asistio"].'</td>
@@ -664,7 +664,7 @@ if ($esIndividual && count($empleados) > 0) {
   $empInfo = $empleados[0];
   $empNombreCompleto = pdfEsc(trim($empInfo["nombres"] . " " . $empInfo["apellidos"]));
   $empCargo = pdfEsc($empInfo["cargo"]);
-  $empTurno = pdfEsc($empInfo["turno"] ?? "â€”");
+  $empTurno = pdfEsc($empInfo["turno"] ?? "-");
 
   $html .= '
 <div class="box">
@@ -681,7 +681,7 @@ if ($esIndividual && count($empleados) > 0) {
     $html .= '<div class="box">
       <table>
         <tr>
-          <th>Total AsistiÃ³</th><th>A tiempo</th><th>Retardos</th><th>Salidas tardÃ­as</th><th>Permisos</th><th>Reposos</th><th>Ausencias</th>
+          <th>Total AsistiÓ</th><th>A tiempo</th><th>Retardos</th><th>Salidas tardías</th><th>Permisos</th><th>Reposos</th><th>Ausencias</th>
         </tr>
         <tr>
           <td>'.$r["asistio"].'</td>
@@ -700,8 +700,8 @@ if ($esIndividual && count($empleados) > 0) {
   $html .= '<h2>Resumen por empleado</h2>
 <table>
   <tr>
-    <th>CÃ©dula</th><th>Empleado</th><th>Turno</th>
-    <th>AsistiÃ³</th><th>A tiempo</th><th>Tarde</th><th>Salida tardÃ­a</th><th>Permiso</th><th>Reposo</th><th>Ausente</th>
+    <th>Cédula</th><th>Empleado</th><th>Turno</th>
+    <th>AsistiÓ</th><th>A tiempo</th><th>Tarde</th><th>Salida tardía</th><th>Permiso</th><th>Reposo</th><th>Ausente</th>
   </tr>';
 
   foreach ($resumen as $r) {
@@ -727,12 +727,12 @@ $html .= '
 <h2>Detalle de incidencias (no a tiempo)</h2>';
 
 if ($detalleExcedido) {
-  $html .= '<div class="meta">Detalle limitado a '.$maxDetalle.' registros. Use rangos mÃ¡s cortos para ver el detalle completo.</div>';
+  $html .= '<div class="meta">Detalle limitado a '.$maxDetalle.' registros. Use rangos más cortos para ver el detalle completo.</div>';
 }
 
 $html .= '<table>
   <tr>
-    <th>Fecha</th><th>CÃ©dula</th><th>Empleado</th><th>Turno</th><th>Estado</th><th>Detalle / JustificaciÃ³n</th>
+    <th>Fecha</th><th>Cédula</th><th>Empleado</th><th>Turno</th><th>Estado</th><th>Detalle / JustificaciÓn</th>
   </tr>';
 
 foreach ($incidencias as $i) {
@@ -752,7 +752,7 @@ $pdf->writeHTML($html, true, false, true, false, '');
 
 
 if (headers_sent($archivoHeaders, $lineaHeaders)) {
-  die("No se pudo generar el PDF porque ya se enviaron encabezados en: " . $archivoHeaders . " lÃ­nea " . $lineaHeaders);
+  die("No se pudo generar el PDF porque ya se enviaron encabezados en: " . $archivoHeaders . " línea " . $lineaHeaders);
 }
 
 $pdf->Output($filename, "I");

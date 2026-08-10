@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require_once __DIR__ . "/../includes/config.php";
 require_once __DIR__ . "/../includes/funciones.php";
 require_once __DIR__ . "/../includes/conexion.php";
@@ -39,7 +39,7 @@ function barcode_err($msg) {
 }
 
 if ($_SERVER["REQUEST_METHOD"] !== "POST") {
-  barcode_err("Acceso invÃ¡lido");
+  barcode_err("Acceso inválido");
 }
 
 $csrf_redirect_url = $redirect_url . (strpos($redirect_url, "?") === false ? "?" : "&") . "barcode_msg=" . urlencode("Solicitud invalida. Intenta nuevamente.") . "&barcode_type=error";
@@ -72,18 +72,18 @@ if ($es_kiosko) {
 
 if ($redirect_to === "") {
   requireLogin();
-  verifyCsrfOrRedirect($redirect_default . "?err=" . urlencode("Solicitud invÃ¡lida. Intenta nuevamente."));
+  verifyCsrfOrRedirect($redirect_default . "?err=" . urlencode("Solicitud inválida. Intenta nuevamente."));
   requirePermiso("marcar_asistencia", $redirect_default);
 }
 
 $codigo_barra = trim($_POST["codigo_barra"] ?? "");
 if ($codigo_barra === "") {
-  barcode_err("CÃ³digo de barras vacÃ­o");
+  barcode_err("CÓdigo de barras vacío");
 }
 
 $empleado = empleadoPorCodigoBarra($pdo, $codigo_barra);
 if (!$empleado) {
-  barcode_err("No se encontrÃ³ un empleado con ese cÃ³digo de barras");
+  barcode_err("No se encontrÓ un empleado con ese cÓdigo de barras");
 }
 
 $empleado_id = (int)$empleado["id"];
@@ -100,7 +100,7 @@ if (!$emp) {
 }
 
 if (strtoupper(trim((string)$emp["estado"])) !== "ACTIVO") {
-  barcode_err("El empleado no estÃ¡ ACTIVO");
+  barcode_err("El empleado no está ACTIVO");
 }
 
 if (!$es_kiosko && !puedeVerTurno($emp["turno_nombre"] ?? "")) {
@@ -216,6 +216,6 @@ if (!$asistencia || empty($asistencia["hora_entrada"])) {
   ]);
 
 } else {
-  barcode_err("Ya registrÃ³ entrada y salida hoy");
+  barcode_err("Ya registrÓ entrada y salida hoy");
 }
 
