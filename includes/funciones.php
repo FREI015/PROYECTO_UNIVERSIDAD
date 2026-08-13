@@ -27,23 +27,85 @@ function go(string $url) {
 function safeNext($next, $default = ""): string {
   $default = $default ?: (BASE_URL . "/modulos/asistencias.php");
   $next = trim((string)$next);
-  if ($next === "") return $default;
 
-  // absoluta http(s)
-  if (preg_match('~^https?://~i', $next)) {
-    // Solo permitir si es de este mismo origen
-    if (strpos($next, BASE_ORIGIN) === 0) return $next;
+  if ($next === "") {
     return $default;
   }
 
-  // ruta absoluta del sitio (/control_asistencia/...)
-  if (isset($next[0]) && $next[0] === "/") {
-    // permitir solo si apunta al mismo proyecto
-    if (BASE_PATH !== "/" && strpos($next, BASE_PATH . "/") !== 0) return $default;
-    return $next; // Location acepta rutas absolutas del sitio
+  if (preg_match('/[\r\n]/', $next)) {
+    return $default;
   }
 
-  // relativa
+  if (preg_match('~^https?://~i', $next)) {
+    $target = parse_url($next);
+    $origin = parse_url(BASE_ORIGIN);
+
+    if (!is_array($target) || !is_array($origin)) {
+      return $default;
+    }
+
+    $targetScheme = strtolower((string)($target["scheme"] ?? ""));
+    $originScheme = strtolower((string)($origin["scheme"] ?? ""));
+    $targetHost = strtolower((string)($target["host"] ?? ""));
+    $originHost = strtolower((string)($origin["host"] ?? ""));
+
+    $targetPort = isset($target["port"])
+      ? (int)$target["port"]
+      : ($targetScheme === "https" ? 443 : 80);
+
+    $originPort = isset($origin["port"])
+      ? (int)$origin["port"]
+      : ($originScheme === "https" ? 443 : 80);
+
+    if (
+      $targetScheme !== $originScheme ||
+      $targetHost !== $originHost ||
+      $targetPort !== $originPort
+    ) {
+      return $default;
+    }
+
+    $path = (string)($target["path"] ?? "/");
+
+    if (
+      BASE_PATH !== "/" &&
+      $path !== BASE_PATH &&
+      strpos($path, BASE_PATH . "/") !== 0
+    ) {
+      return $default;
+    }
+
+    return $next;
+  }
+
+  if (isset($next[0]) && $next[0] === "/") {
+    if (strncmp($next, "//", 2) === 0) {
+      return $default;
+    }
+
+    $path = parse_url($next, PHP_URL_PATH);
+
+    if (!is_string($path)) {
+      return $default;
+    }
+
+    if (
+      BASE_PATH !== "/" &&
+      $path !== BASE_PATH &&
+      strpos($path, BASE_PATH . "/") !== 0
+    ) {
+      return $default;
+    }
+
+    return $next;
+  }
+
+  $normal = str_replace("\\", "/", $next);
+
+  if (preg_match('~(^|/)\.\.?(/|$)~', $normal)) {
+    return $default;
+  }
+
   return BASE_URL . "/" . ltrim($next, "/");
 }
 
