@@ -11,7 +11,7 @@ if ($_SERVER["REQUEST_METHOD"] !== "POST") {
 }
 
 verifyCsrfOrRedirect(BASE_URL . "/modulos/personal.php?err=" . urlencode("Solicitud inválida. Intenta nuevamente."));
-requirePermiso("ver_personal", BASE_URL . "/modulos/personal.php");
+requirePermiso("cambiar_estado_personal", BASE_URL . "/modulos/personal.php");
 
 $id = (int)($_POST["id"] ?? 0);
 $empleadoScopeId = isset($empleado_id) ? (int)$empleado_id : (int)$id;

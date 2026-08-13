@@ -196,18 +196,46 @@ function esRolGlobal(?string $rol = null): bool {
   return in_array($rol, ["DIRECTORA", "SUBDIRECTOR"], true);
 }
 
-function permisosPorRol(): array {
+function permisosSistema(): array {
   return [
-    "DIRECTORA" => ["*"],
-    "SUBDIRECTOR" => ["ver_asistencias", "marcar_asistencia", "ver_personal", "ver_permisos", "ver_reposos", "ver_reportes", "administrar_usuarios"],
+    "ver_asistencias",
+    "marcar_asistencia",
+    "ver_personal",
+    "crear_personal",
+    "cambiar_estado_personal",
+    "ver_permisos",
+    "crear_permisos",
+    "ver_reposos",
+    "crear_reposos",
+    "ver_reportes",
+    "ver_usuarios",
+    "crear_usuarios",
+    "cambiar_estado_usuarios",
+    "cambiar_clave_usuarios",
+  ];
+}
 
-    // Roles operativos por turno.
-    // Roles operativos limitados por filtros de turno
-    // en Personal, Permisos, Reposos, Reportes y PDF.
-    "DIURNO" => ["ver_asistencias", "marcar_asistencia", "ver_personal", "ver_permisos", "ver_reposos", "ver_reportes"],
-    "TARDE" => ["ver_asistencias", "marcar_asistencia", "ver_personal", "ver_permisos", "ver_reposos", "ver_reportes"],
-    "VESPERTINO" => ["ver_asistencias", "marcar_asistencia", "ver_personal", "ver_permisos", "ver_reposos", "ver_reportes"],
-    "NOCTURNO" => ["ver_asistencias", "marcar_asistencia", "ver_personal", "ver_permisos", "ver_reposos", "ver_reportes"],
+function permisosPorRol(): array {
+  $operativos = [
+    "ver_asistencias",
+    "marcar_asistencia",
+    "ver_personal",
+    "crear_personal",
+    "cambiar_estado_personal",
+    "ver_permisos",
+    "crear_permisos",
+    "ver_reposos",
+    "crear_reposos",
+    "ver_reportes",
+  ];
+
+  $administrativos = permisosSistema();
+
+  return [
+    "DIRECTORA" => $administrativos,
+    "SUBDIRECTOR" => $administrativos,
+    "DIURNO" => $operativos,
+    "TARDE" => $operativos,
   ];
 }
 
@@ -219,7 +247,7 @@ function puede(string $permiso): bool {
     return false;
   }
 
-  return in_array("*", $mapa[$rol], true) || in_array($permiso, $mapa[$rol], true);
+  return in_array($permiso, $mapa[$rol], true);
 }
 
 function requirePermiso(string $permiso, string $redirect = ""): void {
@@ -249,8 +277,6 @@ function turnosPermitidosPorRol(?string $rol = null): array {
   $mapa = [
     "DIURNO" => ["MATUTINO"],
     "TARDE" => ["VESPERTINO"],
-    "VESPERTINO" => ["VESPERTINO"],
-    "NOCTURNO" => ["NOCTURNO"],
   ];
 
   return $mapa[$rol] ?? [];
@@ -308,7 +334,9 @@ function estadosUsuarioDisponibles(): array {
 }
 
 function puedeAdministrarUsuarios(): bool {
-  return puede("administrar_usuarios");
+  return puede("crear_usuarios")
+    || puede("cambiar_estado_usuarios")
+    || puede("cambiar_clave_usuarios");
 }
 
 function puedeGestionarRolUsuario(?string $rolObjetivo): bool {
@@ -356,7 +384,7 @@ function estadoUsuarioValido(string $estado): bool {
 }
 
 function usuarioPuedeAccederModuloUsuarios(): bool {
-  return puedeAdministrarUsuarios();
+  return puede("ver_usuarios");
 }
 
 function empleadoPorCodigoBarra(PDO $pdo, string $codigo): ?array {

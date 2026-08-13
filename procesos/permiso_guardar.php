@@ -11,7 +11,7 @@ if ($_SERVER["REQUEST_METHOD"] !== "POST") {
 }
 
 verifyCsrfOrRedirect(BASE_URL . "/modulos/permisos.php?err=" . urlencode("Solicitud inválida. Intenta nuevamente."));
-requirePermiso("ver_permisos", BASE_URL . "/modulos/permisos.php");
+requirePermiso("crear_permisos", BASE_URL . "/modulos/permisos.php");
 
 $empleado_id = (int)($_POST["empleado_id"] ?? 0);
 if ($empleado_id > 0) {

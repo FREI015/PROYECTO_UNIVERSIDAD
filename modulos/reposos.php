@@ -3,6 +3,7 @@ require_once __DIR__ . "/../includes/config.php";
 require_once __DIR__ . "/../includes/funciones.php";
 requireLogin();
 requirePermiso("ver_reposos", BASE_URL . "/index.php");
+$puedeCrearReposos = puede("crear_reposos");
 function reposoEmpleadoPermitido(PDO $pdo, int $empleadoId): bool {
   if (tieneAlcanceGlobalTurnos()) {
     return true;
@@ -220,7 +221,8 @@ require_once __DIR__ . "/../includes/header.php";
     <?php if ($msg): ?><div class="alert ok"><?php echo e($msg); ?></div><?php endif; ?>
     <?php if ($err): ?><div class="alert bad"><?php echo e($err); ?></div><?php endif; ?>
 
-    <div class="form-narrow">
+    <?php if ($puedeCrearReposos): ?>
+<div class="form-narrow">
       <div class="form-box">
         <form class="reposos-form-modern" method="POST" action="../procesos/reposo_guardar.php" id="formReposo">
     <?php echo csrfInput(); ?>
@@ -279,6 +281,7 @@ require_once __DIR__ . "/../includes/header.php";
         </form>
       </div>
     </div>
+<?php endif; ?>
   </div>
 
   <div class="card" style="margin-top:14px;">

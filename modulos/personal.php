@@ -7,6 +7,8 @@ require_once __DIR__ . "/../includes/conexion.php";
 
 $turnosPermitidos = turnosPermitidosPorRol();
 $tieneAlcanceGlobal = tieneAlcanceGlobalTurnos();
+$puedeCrearPersonal = puede("crear_personal");
+$puedeCambiarEstadoPersonal = puede("cambiar_estado_personal");
 $turnoIdsPermitidos = [];
 
 $msg = trim($_GET["msg"] ?? "");
@@ -375,7 +377,8 @@ require_once __DIR__ . "/../includes/header.php";
 <?php endif; ?>
     <?php if ($err): ?><div class="alert bad"><?php echo e($err); ?></div><?php endif; ?>
 
-    <div class="pers-form">
+    <?php if ($puedeCrearPersonal): ?>
+<div class="pers-form">
       <form class="personal-form-modern" method="POST" action="../procesos/personal_guardar.php" id="formPersonal" enctype="multipart/form-data">
     <?php echo csrfInput(); ?>
         <div class="grid4">
@@ -429,6 +432,7 @@ require_once __DIR__ . "/../includes/header.php";
         </div>
       </form>
     </div>
+<?php endif; ?>
   </div>
 
     <div class="card table-card">
@@ -508,7 +512,8 @@ require_once __DIR__ . "/../includes/header.php";
               </span>
             </td>
             <td>
-              <form method="POST" action="../procesos/personal_estado.php" class="actions-personal">
+              <?php if ($puedeCambiarEstadoPersonal): ?>
+                <form method="POST" action="../procesos/personal_estado.php" class="actions-personal">
     <?php echo csrfInput(); ?>
                 <input type="hidden" name="id" value="<?php echo (int)$p["id"]; ?>">
 
@@ -524,6 +529,9 @@ require_once __DIR__ . "/../includes/header.php";
                   <button type="submit" name="accion" value="activar" class="btn-action btn-activar">Reingresar</button>
                 <?php endif; ?>
               </form>
+              <?php else: ?>
+                <span class="scope-note">Solo lectura</span>
+              <?php endif; ?>
             </td>
           </tr>
         <?php endforeach; ?>

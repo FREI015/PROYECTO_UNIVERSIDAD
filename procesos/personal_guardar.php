@@ -10,7 +10,7 @@ if ($_SERVER["REQUEST_METHOD"] !== "POST") {
 }
 
 verifyCsrfOrRedirect(BASE_URL . "/modulos/personal.php?err=" . urlencode("Solicitud inválida. Intenta nuevamente."));
-requirePermiso("ver_personal", BASE_URL . "/modulos/personal.php");
+requirePermiso("crear_personal", BASE_URL . "/modulos/personal.php");
 
 $nombres   = trim($_POST["nombres"] ?? "");
 $apellidos = trim($_POST["apellidos"] ?? "");

@@ -23,6 +23,9 @@ $rolesDisponibles = rolesUsuarioDisponibles();
 $estadosDisponibles = estadosUsuarioDisponibles();
 $usuarioActualInfo = usuarioActual();
 $usuarioActualId = (int)($usuarioActualInfo["id"] ?? ($_SESSION["usuario_id"] ?? 0));
+$puedeCrearUsuarios = puede("crear_usuarios");
+$puedeCambiarEstadoUsuarios = puede("cambiar_estado_usuarios");
+$puedeCambiarClaveUsuarios = puede("cambiar_clave_usuarios");
 
 $where = [];
 $params = [];
@@ -364,7 +367,8 @@ require_once __DIR__ . "/../includes/header.php";
       <?php endforeach; ?>
     </div>
 
-    <div class="create-user-card">
+    <?php if ($puedeCrearUsuarios): ?>
+<div class="create-user-card">
       <div class="create-user-title">Crear usuario</div>
       <p class="create-user-sub">
         Crea usuarios con clave segura. La clave no se muestra ni queda expuesta en pantalla.
@@ -415,6 +419,7 @@ require_once __DIR__ . "/../includes/header.php";
         </div>
       </form>
     </div>
+<?php endif; ?>
 
     <form class="filters" method="GET" action="usuarios.php">
       <div class="field">
@@ -537,7 +542,7 @@ require_once __DIR__ . "/../includes/header.php";
             <td>
               <?php
                 $esUsuarioActual = ((int)$u["id"] === $usuarioActualId);
-                $puedeCambiarEstado = $puedeGestionar && !$esUsuarioActual;
+                $puedeCambiarEstado = $puedeCambiarEstadoUsuarios && $puedeGestionar && !$esUsuarioActual;
                 $estadoDestino = $estado === "ACTIVO" ? "INACTIVO" : "ACTIVO";
                 $textoAccion = $estadoDestino === "ACTIVO" ? "Activar" : "Inactivar";
                 $claseAccion = $estadoDestino === "ACTIVO" ? "btn-activate" : "btn-deactivate";
@@ -558,7 +563,7 @@ require_once __DIR__ . "/../includes/header.php";
                 <span class="locked-note">Protegido</span>
               <?php endif; ?>
 
-              <?php if ($puedeGestionar): ?>
+              <?php if ($puedeCambiarClaveUsuarios && $puedeGestionar): ?>
                 <div class="password-users">
                   <form method="POST" action="../procesos/usuario_clave.php" onsubmit="return confirm('Confirmar cambio de clave del usuario <?php echo e($usuarioNombre); ?>');">
                     <?php echo csrfInput(); ?>

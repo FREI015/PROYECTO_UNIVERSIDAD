@@ -7,9 +7,7 @@ if ($_SERVER["REQUEST_METHOD"] !== "POST") {
   go(BASE_URL . "/modulos/usuarios.php?err=" . urlencode("Acceso inválido"));
 }
 
-if (!usuarioPuedeAccederModuloUsuarios()) {
-  go(BASE_URL . "/modulos/asistencias.php?err=" . urlencode("No tienes permiso para administrar usuarios."));
-}
+requirePermiso("crear_usuarios", BASE_URL . "/modulos/usuarios.php");
 
 verifyCsrfOrRedirect(BASE_URL . "/modulos/usuarios.php?err=" . urlencode("Solicitud inválida. Intenta nuevamente."));
 

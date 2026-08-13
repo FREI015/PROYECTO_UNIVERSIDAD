@@ -3,6 +3,7 @@ require_once __DIR__ . "/../includes/config.php";
 require_once __DIR__ . "/../includes/funciones.php";
 requireLogin();
 requirePermiso("ver_permisos", BASE_URL . "/index.php");
+$puedeCrearPermisos = puede("crear_permisos");
 function permisoEmpleadoPermitido(PDO $pdo, int $empleadoId): bool {
   if (tieneAlcanceGlobalTurnos()) {
     return true;
@@ -290,7 +291,8 @@ require_once __DIR__ . "/../includes/header.php";
     <?php if ($msg): ?><div class="alert ok"><?php echo e($msg); ?></div><?php endif; ?>
     <?php if ($err): ?><div class="alert bad"><?php echo e($err); ?></div><?php endif; ?>
 
-    <div class="perm-form">
+    <?php if ($puedeCrearPermisos): ?>
+<div class="perm-form">
       <form class="permissions-form-modern" method="POST" action="../procesos/permiso_guardar.php" id="formPermiso">
     <?php echo csrfInput(); ?>
         <div class="grid">
@@ -344,6 +346,7 @@ require_once __DIR__ . "/../includes/header.php";
         </div>
       </form>
     </div>
+<?php endif; ?>
   </div>
 
   <div class="card table-card">
