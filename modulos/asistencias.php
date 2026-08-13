@@ -1042,7 +1042,7 @@ if ($inicialFoto === "") {
 <div class="modal-overlay" id="modalEmergencia">
   <div class="modal-box">
     <h3>Modo Emergencia</h3>
-    <p style="font-size:13px;color:#6b7280;margin-bottom:14px">Ingresa credenciales de administrador (DIRECTORA o SUPER) para activar.</p>
+    <p style="font-size:13px;color:#6b7280;margin-bottom:14px">Ingresa credenciales de Directora o Subdirector para activar.</p>
     <form method="POST" action="../procesos/modo_emergencia.php">
     <?php echo csrfInput(); ?>
       <input type="hidden" name="accion" value="activar">

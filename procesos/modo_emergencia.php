@@ -35,10 +35,10 @@ if ($accion === "activar") {
     go(BASE_URL . "/modulos/asistencias.php?err=" . urlencode("Completa usuario y clave"));
   }
 
-  // Validar contra tabla usuarios con rol de admin (DIRECTORA o SUPER)
+
   $stmt = $pdo->prepare(
-    "SELECT id, usuario, clave, rol, estado FROM usuarios 
-     WHERE (rol = 'DIRECTORA' OR rol = 'SUPER') AND usuario = ? LIMIT 1"
+    "SELECT id, usuario, clave, rol, estado FROM usuarios
+     WHERE rol IN ('DIRECTORA','SUBDIRECTOR') AND usuario = ? LIMIT 1"
   );
   $stmt->execute([$usuario]);
   $user = $stmt->fetch(PDO::FETCH_ASSOC);

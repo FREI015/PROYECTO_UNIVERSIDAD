@@ -1,4 +1,4 @@
-﻿/*
+/*
   SANEAMIENTO PROFESIONAL DE BASE DE DATOS
   Proyecto: Control de Asistencia
   Motor: MySQL/MariaDB
@@ -7,7 +7,6 @@
   Corrige inconsistencias reales detectadas:
   - empleados.codigo_barra faltante en bd.sql.
   - migracion de codigo_barra integrada.
-  - usuario administrador inicial.
   - cargos base iniciales.
   - indices para consultas frecuentes.
   - relaciones protegidas para no borrar historial.
@@ -34,8 +33,6 @@ INSERT IGNORE INTO cargos (nombre, descripcion) VALUES
 ('OBRERO', 'Personal obrero'),
 ('DIRECTIVO', 'Personal directivo');
 
-INSERT IGNORE INTO usuarios (usuario, clave, rol, estado) VALUES
-('admin', '$2y$12$SsPXfsZtjLXq0cS0NkfF/OddV1RikJbkG5VETWVcb.SCio6Q.qseu', 'SUPER', 'ACTIVO');
 
 DELIMITER $$
 

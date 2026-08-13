@@ -63,8 +63,8 @@ El archivo versionado para referencia es conexion.example.php.
 
 ## Roles principales
 
-- SUPER
 - DIRECTORA
+- SUBDIRECTOR
 - DIURNO
 - TARDE
 

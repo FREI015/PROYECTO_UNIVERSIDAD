@@ -55,8 +55,8 @@ $sql = "
   $whereSql
   ORDER BY
     CASE rol
-      WHEN 'SUPER' THEN 1
-      WHEN 'DIRECTORA' THEN 2
+      WHEN 'DIRECTORA' THEN 1
+      WHEN 'SUBDIRECTOR' THEN 2
       WHEN 'DIURNO' THEN 3
       WHEN 'TARDE' THEN 4
       ELSE 5
@@ -345,7 +345,7 @@ require_once __DIR__ . "/../includes/header.php";
   <div class="card usuarios-card">
     <div class="usuarios-title">Administracion de usuarios</div>
     <p class="usuarios-sub">
-      Consulta usuarios, roles y estados del sistema. Esta etapa es solo lectura; crear, activar, inactivar y cambiar claves se implementa en las siguientes etapas.
+      Consulta y administra usuarios, roles y estados del sistema según el alcance de la cuenta actual.
     </p>
 
     <?php if ($msg): ?><div class="alert ok"><?php echo e($msg); ?></div><?php endif; ?>
@@ -464,14 +464,13 @@ require_once __DIR__ . "/../includes/header.php";
 
   <div class="users-roles-scope-grid">
     <div class="users-role-card">
-      <div class="users-role-name">Super administrador</div>
-      <p>Acceso general al sistema. Recomendado solo para la cuenta principal de administracion.</p>
+      <div class="users-role-name">Directora</div>
+      <p>Máxima autoridad administrativa del sistema y gestión de la jerarquía de usuarios.</p>
       <span>Alcance: todos los turnos</span>
     </div>
-
     <div class="users-role-card">
-      <div class="users-role-name">Directora</div>
-      <p>Supervisión general de asistencia, personal, reportes, permisos y reposos.</p>
+      <div class="users-role-name">Subdirector</div>
+      <p>Supervisión operativa general y administración de usuarios de los turnos.</p>
       <span>Alcance: todos los turnos</span>
     </div>
 
@@ -684,7 +683,7 @@ require_once __DIR__ . "/../includes/header.php";
 
       var help = document.createElement("div");
       help.className = "users-role-help";
-      help.innerHTML = "<strong>Rol:</strong> define el alcance operativo del usuario. Super administrador y Directora trabajan con todos los turnos; Diurno/Matutino y Tarde/Vespertino limitan el alcance al turno correspondiente.";
+      help.innerHTML = "<strong>Rol:</strong> define el alcance operativo del usuario. Directora y Subdirector trabajan con todos los turnos; Diurno/Matutino y Tarde/Vespertino limitan el alcance al turno correspondiente.";
 
       parent.appendChild(help);
     });

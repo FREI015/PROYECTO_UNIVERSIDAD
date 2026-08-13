@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
   id INT AUTO_INCREMENT PRIMARY KEY,
   usuario VARCHAR(50) NOT NULL UNIQUE,
   clave VARCHAR(255) NOT NULL,
-  rol ENUM('DIURNO','TARDE','DIRECTORA','SUPER') NOT NULL DEFAULT 'DIURNO',
+  rol ENUM('DIURNO','TARDE','DIRECTORA','SUBDIRECTOR') NOT NULL DEFAULT 'DIURNO',
   estado ENUM('ACTIVO','INACTIVO') NOT NULL DEFAULT 'ACTIVO',
   creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
@@ -112,9 +112,6 @@ INSERT IGNORE INTO cargos (nombre, descripcion) VALUES
 ('OBRERO', 'Personal obrero'),
 ('DIRECTIVO', 'Personal directivo');
 
--- Usuario administrador inicial (clave: admin)
-INSERT IGNORE INTO usuarios (usuario, clave, rol, estado) VALUES
-('admin', '$2y$12$SsPXfsZtjLXq0cS0NkfF/OddV1RikJbkG5VETWVcb.SCio6Q.qseu', 'SUPER', 'ACTIVO');
 
 -- Codigo de barras inicial para empleados existentes (formato EMP + id de 5 digitos)
 UPDATE empleados

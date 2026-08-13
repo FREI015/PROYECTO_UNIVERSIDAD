@@ -193,13 +193,13 @@ function rolActual(): string {
 
 function esRolGlobal(?string $rol = null): bool {
   $rol = strtoupper(trim((string)($rol ?? rolActual())));
-  return in_array($rol, ["SUPER", "DIRECTORA"], true);
+  return in_array($rol, ["DIRECTORA", "SUBDIRECTOR"], true);
 }
 
 function permisosPorRol(): array {
   return [
-    "SUPER" => ["*"],
     "DIRECTORA" => ["*"],
+    "SUBDIRECTOR" => ["ver_asistencias", "marcar_asistencia", "ver_personal", "ver_permisos", "ver_reposos", "ver_reportes", "administrar_usuarios"],
 
     // Roles operativos por turno.
     // Roles operativos limitados por filtros de turno
@@ -296,7 +296,7 @@ function rolesUsuarioDisponibles(): array {
     "DIURNO" => "Diurno / Matutino",
     "TARDE" => "Tarde / Vespertino",
     "DIRECTORA" => "Directora",
-    "SUPER" => "Super administrador",
+    "SUBDIRECTOR" => "Subdirector",
   ];
 }
 
@@ -319,12 +319,12 @@ function puedeGestionarRolUsuario(?string $rolObjetivo): bool {
     return false;
   }
 
-  if ($rolActual === "SUPER") {
-    return true;
+  if ($rolActual === "DIRECTORA") {
+    return in_array($rolObjetivo, ["SUBDIRECTOR", "DIURNO", "TARDE"], true);
   }
 
-  if ($rolActual === "DIRECTORA") {
-    return $rolObjetivo !== "SUPER";
+  if ($rolActual === "SUBDIRECTOR") {
+    return in_array($rolObjetivo, ["DIURNO", "TARDE"], true);
   }
 
   return false;
