@@ -2,6 +2,8 @@
 require_once __DIR__ . "/includes/config.php";
 require_once __DIR__ . "/includes/funciones.php";
 
+noCache();
+
 $err =
   trim(
     (string)(
@@ -152,6 +154,7 @@ $err =
     </h1>
 
     <p class="recovery-sub">
+      Este proceso funciona aunque no tengas una sesión iniciada.
       Ingresa tu usuario, uno de tus códigos de recuperación
       y la nueva clave que deseas establecer.
     </p>

@@ -1,6 +1,8 @@
 <?php
 require_once __DIR__ . "/includes/config.php";
 require_once __DIR__ . "/includes/funciones.php";
+
+noCache();
 requireLogin();
 require_once __DIR__ . "/includes/conexion.php";
 
@@ -19,6 +21,23 @@ if ($usuarioIdRecuperacion <= 0) {
     "Sesion invalida. Inicia sesion nuevamente."
   );
 }
+
+$rolRecuperacion =
+  strtoupper(
+    trim(
+      (string)rolActual()
+    )
+  );
+
+$esCuentaAdministrativaRecuperacion =
+  in_array(
+    $rolRecuperacion,
+    [
+      "DIRECTORA",
+      "SUBDIRECTOR",
+    ],
+    true
+  );
 
 $msg =
   trim(
@@ -224,6 +243,22 @@ require_once __DIR__ . "/includes/header.php";
   line-height:1.5;
 }
 
+.recovery-profile-back{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:42px;
+  margin-top:18px;
+  padding:8px 14px;
+  border:1px solid #d7c1c8;
+  border-radius:12px;
+  background:#fff;
+  color:#800020;
+  text-decoration:none;
+  font-size:13px;
+  font-weight:900;
+}
+
 @media(max-width:700px){
   .recovery-codes{
     grid-template-columns:1fr;
@@ -270,6 +305,34 @@ require_once __DIR__ . "/includes/header.php";
         <?php echo $codigosActivos; ?>
       </strong>
     </div>
+
+    <?php if ($codigosActivos === 0): ?>
+
+      <div class="recovery-warning">
+
+        <strong>
+          Recuperacion no configurada.
+        </strong>
+
+        <br>
+
+        <?php if ($esCuentaAdministrativaRecuperacion): ?>
+
+          Esta es una cuenta administrativa.
+          Genera y guarda este lote antes de cerrar sesion.
+          Por seguridad, otro administrador no puede
+          restablecer la clave de esta cuenta administrativa.
+
+        <?php else: ?>
+
+          Genera un lote para poder recuperar tu propia cuenta
+          si olvidas la clave.
+
+        <?php endif; ?>
+
+      </div>
+
+    <?php endif; ?>
 
     <?php if ($codigosMostrar !== []): ?>
 
@@ -349,6 +412,13 @@ require_once __DIR__ . "/includes/header.php";
       </p>
 
     </form>
+
+    <a
+      class="recovery-profile-back"
+      href="<?php echo e(BASE_URL); ?>/mi_perfil.php"
+    >
+      Volver a Mi perfil
+    </a>
 
   </div>
 

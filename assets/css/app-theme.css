@@ -5253,3 +5253,422 @@ form.reposos-form-modern .grid > *:has(input[type="submit"]){
   border-color:rgba(128,0,32,.14) !important;
 }
 
+/* ==========================================================
+   BLOQUE 10B1G - HEADER DISTRIBUIDO EN TRES ZONAS
+
+   | MARCA | NAVEGACION | PERFIL + SALIR |
+
+   - una sola linea
+   - opciones separadas
+   - extremos reales
+   - menu central compacto
+   ========================================================== */
+
+.app-topline{
+  width:100% !important;
+
+  height:auto !important;
+  min-height:62px !important;
+
+  margin:0 !important;
+  padding:0 !important;
+
+  overflow:visible !important;
+}
+
+.app-topline-inner{
+  width:100% !important;
+  max-width:none !important;
+
+  min-height:62px !important;
+
+  margin:0 !important;
+
+  padding:
+    8px
+    clamp(14px,2.4vw,46px) !important;
+
+  display:grid !important;
+
+  grid-template-columns:
+    minmax(210px,1fr)
+    auto
+    minmax(210px,1fr) !important;
+
+  align-items:center !important;
+
+  column-gap:
+    clamp(12px,1.8vw,30px) !important;
+
+  overflow:visible !important;
+}
+
+/* ----------------------------------------------------------
+   EXTREMO IZQUIERDO
+   ---------------------------------------------------------- */
+
+.app-brand{
+  grid-column:1 !important;
+
+  justify-self:start !important;
+
+  display:inline-flex !important;
+
+  align-items:center !important;
+
+  min-width:0 !important;
+
+  margin:0 !important;
+
+  gap:8px !important;
+
+  position:static !important;
+  inset:auto !important;
+  transform:none !important;
+}
+
+.app-brand-logo{
+  flex:0 0 38px !important;
+
+  width:38px !important;
+  height:38px !important;
+  min-width:38px !important;
+}
+
+.app-brand-copy{
+  display:flex !important;
+
+  flex-direction:row !important;
+  flex-wrap:nowrap !important;
+
+  align-items:baseline !important;
+
+  gap:5px !important;
+
+  min-width:0 !important;
+
+  white-space:nowrap !important;
+}
+
+.app-brand-copy strong{
+  margin:0 !important;
+
+  font-size:13px !important;
+
+  white-space:nowrap !important;
+}
+
+.app-brand-copy small{
+  margin:0 !important;
+
+  font-size:10.5px !important;
+
+  white-space:nowrap !important;
+}
+
+.app-brand-copy small::before{
+  content:"·";
+
+  margin-right:5px;
+
+  color:var(--text-muted);
+}
+
+/* ----------------------------------------------------------
+   CENTRO
+   Capsula limitada al contenido real.
+   ---------------------------------------------------------- */
+
+.app-main-nav{
+  grid-column:2 !important;
+
+  justify-self:center !important;
+
+  width:max-content !important;
+  max-width:min(760px,48vw) !important;
+  min-width:0 !important;
+
+  margin:0 !important;
+
+  padding:2px 6px !important;
+
+  display:flex !important;
+
+  flex-direction:row !important;
+  flex-wrap:nowrap !important;
+
+  align-items:center !important;
+  justify-content:center !important;
+
+  gap:2px !important;
+
+  overflow-x:auto !important;
+  overflow-y:hidden !important;
+
+  scrollbar-width:none !important;
+
+  white-space:nowrap !important;
+
+  position:static !important;
+  inset:auto !important;
+  transform:none !important;
+
+  order:initial !important;
+}
+
+.app-main-nav::-webkit-scrollbar{
+  display:none !important;
+}
+
+.app-main-nav a{
+  flex:0 0 auto !important;
+
+  min-height:34px !important;
+
+  padding:6px 9px !important;
+
+  font-size:12px !important;
+
+  white-space:nowrap !important;
+}
+
+/* ----------------------------------------------------------
+   EXTREMO DERECHO
+   ---------------------------------------------------------- */
+
+.app-user-actions{
+  grid-column:3 !important;
+
+  justify-self:end !important;
+
+  display:flex !important;
+
+  flex-direction:row !important;
+  flex-wrap:nowrap !important;
+
+  align-items:center !important;
+  justify-content:flex-end !important;
+
+  width:auto !important;
+  min-width:0 !important;
+
+  margin:0 !important;
+  padding:0 !important;
+
+  gap:7px !important;
+
+  position:static !important;
+  inset:auto !important;
+  transform:none !important;
+}
+
+.app-user-identity{
+  display:inline-flex !important;
+
+  flex-direction:row !important;
+  flex-wrap:nowrap !important;
+
+  align-items:center !important;
+  justify-content:center !important;
+
+  flex:0 1 auto !important;
+
+  width:auto !important;
+  min-width:0 !important;
+  max-width:205px !important;
+
+  min-height:38px !important;
+
+  margin:0 !important;
+  padding:6px 10px !important;
+
+  gap:5px !important;
+
+  overflow:hidden !important;
+
+  white-space:nowrap !important;
+
+  text-decoration:none !important;
+
+  position:static !important;
+  inset:auto !important;
+  transform:none !important;
+}
+
+.app-user-name{
+  display:inline-block !important;
+
+  width:auto !important;
+  min-width:0 !important;
+  max-width:100px !important;
+
+  margin:0 !important;
+
+  overflow:hidden !important;
+  text-overflow:ellipsis !important;
+
+  white-space:nowrap !important;
+
+  color:var(--primary-strong) !important;
+
+  font-size:12px !important;
+  font-weight:950 !important;
+  line-height:1 !important;
+}
+
+.app-user-name::after{
+  content:"·";
+
+  margin-left:5px;
+
+  color:var(--text-muted);
+}
+
+.app-user-role{
+  display:inline-block !important;
+
+  width:auto !important;
+  min-width:0 !important;
+  max-width:86px !important;
+
+  margin:0 !important;
+
+  overflow:hidden !important;
+  text-overflow:ellipsis !important;
+
+  white-space:nowrap !important;
+
+  color:var(--text-muted) !important;
+
+  font-size:10.5px !important;
+  font-weight:800 !important;
+  line-height:1 !important;
+}
+
+.app-logout{
+  flex:0 0 auto !important;
+
+  min-height:36px !important;
+
+  margin:0 !important;
+
+  padding:7px 10px !important;
+
+  white-space:nowrap !important;
+
+  position:static !important;
+  inset:auto !important;
+  transform:none !important;
+}
+
+/* ==========================================================
+   REDUCCION PROGRESIVA
+   Siempre conserva una sola linea.
+   ========================================================== */
+
+@media (max-width:1250px){
+
+  .app-topline-inner{
+    grid-template-columns:
+      minmax(155px,1fr)
+      auto
+      minmax(175px,1fr) !important;
+
+    padding-left:14px !important;
+    padding-right:14px !important;
+
+    column-gap:9px !important;
+  }
+
+  .app-main-nav{
+    max-width:55vw !important;
+  }
+
+  .app-brand-copy small{
+    display:none !important;
+  }
+
+  .app-brand-copy small::before{
+    display:none !important;
+  }
+}
+
+@media (max-width:980px){
+
+  .app-brand-copy{
+    display:none !important;
+  }
+
+  .app-topline-inner{
+    grid-template-columns:
+      44px
+      minmax(0,1fr)
+      auto !important;
+  }
+
+  .app-main-nav{
+    justify-self:stretch !important;
+
+    width:100% !important;
+    max-width:100% !important;
+
+    justify-content:flex-start !important;
+  }
+
+  .app-user-identity{
+    max-width:155px !important;
+  }
+
+  .app-user-name{
+    max-width:75px !important;
+  }
+
+  .app-user-role{
+    max-width:65px !important;
+  }
+}
+
+@media (max-width:650px){
+
+  .app-topline-inner{
+    grid-template-columns:
+      38px
+      minmax(0,1fr)
+      auto !important;
+
+    padding-left:8px !important;
+    padding-right:8px !important;
+
+    column-gap:5px !important;
+  }
+
+  .app-brand-logo{
+    width:34px !important;
+    height:34px !important;
+    min-width:34px !important;
+  }
+
+  .app-user-role{
+    display:none !important;
+  }
+
+  .app-user-name::after{
+    display:none !important;
+  }
+
+  .app-user-identity{
+    max-width:100px !important;
+
+    padding-left:7px !important;
+    padding-right:7px !important;
+  }
+
+  .app-user-name{
+    max-width:82px !important;
+  }
+
+  .app-logout{
+    padding-left:8px !important;
+    padding-right:8px !important;
+  }
+}

@@ -203,7 +203,7 @@ $logoutUrl = BASE_URL . "/procesos/logout.php";
       color:#800020;
     }
   </style>
-  <link rel="stylesheet" href="<?php echo e(BASE_URL); ?>/assets/css/app-theme.css?v=1">
+  <link rel="stylesheet" href="<?php echo e(BASE_URL); ?>/assets/css/app-theme.css?v=<?php echo e((string)(@filemtime(__DIR__ . "/../assets/css/app-theme.css") ?: 2)); ?>">
 </head>
 <body>
 
@@ -265,16 +265,16 @@ require_once __DIR__ . '/cintillo_institucional.php';
     </nav>
 
     <div class="app-user-actions">
-      <span class="app-user-identity">
-        <span class="app-user-role"><?php echo e($headerRolLabel); ?></span>
-        <span class="app-user-meta"><?php echo e($headerAlcanceTexto); ?> | <?php echo e($headerFecha); ?></span>
-      </span>
       <a
-        class="app-recovery-link <?php echo $active==='recuperacion'?'active':''; ?>"
-        href="<?php echo e(BASE_URL); ?>/codigos_recuperacion.php"
+        class="app-user-identity app-profile-link <?php echo $active==='perfil'?'active':''; ?>"
+        href="<?php echo e(BASE_URL); ?>/mi_perfil.php"
+        aria-label="Abrir Mi perfil"
+        title="Mi perfil"
       >
-        Codigos de recuperacion
+        <span class="app-user-name"><?php echo e($headerUsuarioNombre); ?></span>
+        <span class="app-user-role"><?php echo e($headerRolLabel); ?></span>
       </a>
+
       <a class="app-logout" href="<?php echo e($logoutUrl); ?>">Salir</a>
     </div>
   </div>

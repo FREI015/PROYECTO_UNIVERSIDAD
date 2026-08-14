@@ -1,60 +1,126 @@
 <?php
 
-$cintilloFinal = BASE_URL . "/assets/img/institucional/cintillo_institucional_final.jpeg?v=13e-r6";
+$cintilloArchivo =
+    __DIR__ .
+    "/../assets/img/institucional/cintillo_institucional_final.png";
+
+$cintilloVersion =
+    @filemtime($cintilloArchivo)
+    ?: 1;
+
+$cintilloFinal =
+    BASE_URL .
+    "/assets/img/institucional/cintillo_institucional_final.png?v=" .
+    (string)$cintilloVersion;
+
 ?>
 
 <style>
 
-  .cintillo-final-r6 {
-    width: 100%;
-    position: relative;
-    z-index: 50;
-    margin: 0;
-    padding: 0;
-    background: #ffffff;
-    border: 0;
-    box-shadow: none;
-    overflow: hidden;
-    line-height: 0;
+/* ==========================================================
+   BLOQUE 10B1N
+   CINTILLO PANORAMICO NATIVO
 
-    display: flex;
-    justify-content: center;
-    align-items: center;
-  }
+   Fuente real:
+   5015 x 314 px
 
-  .cintillo-final-r6-inner {
-    width: 70%;
-    margin: 0 auto;
-    padding: 0;
-    background: #ffffff;
-    line-height: 0;
-  }
+   Proporcion:
+   15.971 : 1
 
-  .cintillo-final-r6-img {
-    display: block;
-    width: 70%;
-    max-width: none;
-    height: auto;
-    margin: 0 auto;
-    padding: 0;
-    object-fit: contain;
-    object-position: center center;
-    image-rendering: auto;
-  }
+   La propia imagen ya tiene la proporcion correcta.
 
-  /* Evita línea entre cintillo y navegación */
-  .cintillo-final-r6+.app-topline {
-    margin-top: 0 !important;
-    border-top: 0 !important;
-  }
+   Por eso:
+   - no usamos cover
+   - no usamos contain
+   - no usamos height fija
+   - no usamos clamp
+   - no recortamos
+   - no deformamos
+   ========================================================== */
+
+.cintillo-final-r6{
+  display:block;
+
+  width:100%;
+  max-width:none;
+
+  margin:0;
+  padding:0;
+
+  background:#ffffff;
+
+  border:0;
+  box-shadow:none;
+
+  overflow:hidden;
+
+  line-height:0;
+}
+
+.cintillo-final-r6-inner{
+  display:block;
+
+  width:100%;
+  max-width:none;
+
+  margin:0;
+  padding:0;
+
+  background:#ffffff;
+
+  line-height:0;
+}
+
+.cintillo-final-r6-img{
+  display:block;
+
+  width:100%;
+  height:auto;
+
+  max-width:none;
+
+  margin:0;
+  padding:0;
+
+  border:0;
+
+  image-rendering:auto;
+}
+
+/*
+ * El propio ratio panoramico controla la altura:
+ *
+ * monitor ancho  -> mayor ancho y altura proporcional
+ * laptop         -> reduce proporcionalmente
+ * tablet         -> reduce proporcionalmente
+ * movil          -> reduce proporcionalmente
+ *
+ * Toda la imagen permanece visible.
+ */
+
+.cintillo-final-r6 + .app-topline{
+  margin-top:0 !important;
+  border-top:0 !important;
+}
 
 </style>
 
-<div class="cintillo-final-r6" role="banner" aria-label="Cintillo institucional">
+<div
+  class="cintillo-final-r6"
+  role="banner"
+  aria-label="Cintillo institucional"
+>
   <div class="cintillo-final-r6-inner">
+
     <img
       class="cintillo-final-r6-img"
       src="<?php echo e($cintilloFinal); ?>"
-      alt="Cintillo institucional">
+      alt="Cintillo institucional"
+      width="5015"
+      height="314"
+      loading="eager"
+      fetchpriority="high"
+    >
+
   </div>
 </div>
