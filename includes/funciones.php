@@ -387,6 +387,84 @@ function usuarioPuedeAccederModuloUsuarios(): bool {
   return puede("ver_usuarios");
 }
 
+function calcularSalidaAsistencia(
+  string $fechaAsistencia,
+  string $horaEntrada,
+  string $horaInicio,
+  ?string $horaFin,
+  DateTimeImmutable $ahora,
+  DateTimeZone $tz
+): array {
+  $inicio = new DateTimeImmutable($fechaAsistencia . " " . $horaEntrada, $tz);
+
+  if ($horaFin !== null && $horaFin !== "") {
+    if ($horaInicio > $horaFin && $horaEntrada < $horaFin) {
+      $inicio = $inicio->modify("+1 day");
+    }
+  }
+
+  $diferenciaSegundos = $ahora->getTimestamp() - $inicio->getTimestamp();
+
+  if ($diferenciaSegundos < 0) {
+    return [
+      "ok" => false,
+      "error" => "La hora de salida no puede ser anterior a la entrada",
+    ];
+  }
+
+  $horasTrabajadas = round($diferenciaSegundos / 3600, 2);
+  $salidaEstado = "NORMAL";
+  $minutosSalidaTardia = 0;
+  $observacionSistema = null;
+
+  if ($horaFin !== null && $horaFin !== "") {
+    $finTurno = new DateTimeImmutable(
+      $fechaAsistencia . " " . $horaFin,
+      $tz
+    );
+
+    if ($horaInicio > $horaFin) {
+      $finTurno = $finTurno->modify("+1 day");
+    }
+
+    $diferenciaFinSegundos =
+      $ahora->getTimestamp() - $finTurno->getTimestamp();
+
+    if ($diferenciaFinSegundos > 0) {
+      $minutosSalidaTardia =
+        (int)ceil($diferenciaFinSegundos / 60);
+    }
+
+    $toleranciaSalidaTardia = defined(
+      "SALIDA_TARDIA_TOLERANCIA_MINUTOS"
+    )
+      ? max(
+          0,
+          (int)constant("SALIDA_TARDIA_TOLERANCIA_MINUTOS")
+        )
+      : 0;
+
+    if ($minutosSalidaTardia > $toleranciaSalidaTardia) {
+      $salidaEstado = "SALIDA_TARDIA";
+      $observacionSistema =
+        "Salida tardía: {$minutosSalidaTardia} min después del fin del turno ({$horaFin}).";
+    }
+  } else {
+    $salidaEstado = "SIN_HORARIO";
+    $observacionSistema =
+      "No se pudo comparar la salida porque el turno no tiene hora_fin.";
+  }
+
+  return [
+    "ok" => true,
+    "error" => null,
+    "hora_salida" => $ahora->format("H:i:s"),
+    "horas_trabajadas" => $horasTrabajadas,
+    "salida_estado" => $salidaEstado,
+    "minutos_salida_tardia" => $minutosSalidaTardia,
+    "observacion_sistema" => $observacionSistema,
+  ];
+}
 function empleadoPorCodigoBarra(PDO $pdo, string $codigo): ?array {
   $codigo = trim($codigo);
   if ($codigo === "") return null;

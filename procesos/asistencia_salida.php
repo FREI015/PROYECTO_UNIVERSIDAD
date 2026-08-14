@@ -114,60 +114,33 @@ if (!empty($row["hora_salida"])) {
   exit;
 }
 
-$entrada_time = (string)$row["hora_entrada"];
-$inicio = new DateTimeImmutable($fecha_asistencia . " " . $entrada_time, $tz);
+$salidaCalculada = calcularSalidaAsistencia(
+  $fecha_asistencia,
+  (string)$row["hora_entrada"],
+  (string)$horaInicio,
+  $horaFin !== null ? (string)$horaFin : null,
+  $now,
+  $tz
+);
 
-if ($horaFin !== null) {
-  $hi = (string)$horaInicio;
-  $hf = (string)$horaFin;
-
-  if ($hi > $hf && $entrada_time < $hf) {
-    $inicio = $inicio->modify("+1 day");
-  }
-}
-
-$diffSec = $now->getTimestamp() - $inicio->getTimestamp();
-
-if ($diffSec < 0) {
-  header("Location: " . asistenciaReturnUrl("err", "La hora de salida no puede ser anterior a la entrada"));
+if (!$salidaCalculada["ok"]) {
+  header(
+    "Location: " .
+    asistenciaReturnUrl(
+      "err",
+      (string)$salidaCalculada["error"]
+    )
+  );
   exit;
 }
 
-$horas_trab = round($diffSec / 3600, 2);
-
-$salidaEstado = "NORMAL";
-$minutosSalidaTardia = 0;
-$observacionSistema = null;
-
-if ($horaFin !== null) {
-  $hi = (string)$horaInicio;
-  $hf = (string)$horaFin;
-
-  $finTurno = new DateTimeImmutable($fecha_asistencia . " " . $hf, $tz);
-
-  if ($hi > $hf) {
-    $finTurno = $finTurno->modify("+1 day");
-  }
-
-  $diffFinSec = $now->getTimestamp() - $finTurno->getTimestamp();
-
-  if ($diffFinSec > 0) {
-    $minutosSalidaTardia = (int)ceil($diffFinSec / 60);
-  }
-
-  $toleranciaSalidaTardia = 0;
-  if (defined("SALIDA_TARDIA_TOLERANCIA_MINUTOS")) {
-    $toleranciaSalidaTardia = max(0, (int)constant("SALIDA_TARDIA_TOLERANCIA_MINUTOS"));
-  }
-
-  if ($minutosSalidaTardia > $toleranciaSalidaTardia) {
-    $salidaEstado = "SALIDA_TARDIA";
-    $observacionSistema = "Salida tardía: {$minutosSalidaTardia} min después del fin del turno ({$hf}).";
-  }
-} else {
-  $salidaEstado = "SIN_HORARIO";
-  $observacionSistema = "No se pudo comparar la salida porque el turno no tiene hora_fin.";
-}
+$hora_now = (string)$salidaCalculada["hora_salida"];
+$horas_trab = (float)$salidaCalculada["horas_trabajadas"];
+$salidaEstado = (string)$salidaCalculada["salida_estado"];
+$minutosSalidaTardia =
+  (int)$salidaCalculada["minutos_salida_tardia"];
+$observacionSistema =
+  $salidaCalculada["observacion_sistema"];
 
 $upd = $pdo->prepare("
   UPDATE asistencias
@@ -178,6 +151,7 @@ $upd = $pdo->prepare("
       observacion_sistema = ?
   WHERE id = ?
 ");
+
 $upd->execute([
   $hora_now,
   $horas_trab,
@@ -186,7 +160,6 @@ $upd->execute([
   $observacionSistema,
   (int)$row["id"]
 ]);
-
 $mensaje = "Salida registrada con éxito";
 if ($salidaEstado === "SALIDA_TARDIA") {
   $mensaje = "Salida registrada como tardía ({$minutosSalidaTardia} min)";

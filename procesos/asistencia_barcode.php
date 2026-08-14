@@ -187,32 +187,56 @@ if (!$asistencia || empty($asistencia["hora_entrada"])) {
   ]);
 
 } elseif (empty($asistencia["hora_salida"])) {
-  $entrada_time = (string)$asistencia["hora_entrada"];
-  $inicio = new DateTimeImmutable($fecha_asistencia . " " . $entrada_time, $tz);
+  $salidaCalculada = calcularSalidaAsistencia(
+  $fecha_asistencia,
+  (string)$asistencia["hora_entrada"],
+  (string)$horaInicio,
+  $horaFin !== null ? (string)$horaFin : null,
+  $now,
+  $tz
+);
 
-  if ($horaFin !== null) {
-    $hi = (string)$horaInicio;
-    $hf = (string)$horaFin;
-    if ($hi > $hf && $entrada_time < $hf) {
-      $inicio = $inicio->modify("+1 day");
-    }
-  }
+if (!$salidaCalculada["ok"]) {
+  barcode_err((string)$salidaCalculada["error"]);
+}
 
-  $diffSec = $now->getTimestamp() - $inicio->getTimestamp();
-  if ($diffSec < 0) $diffSec = 0;
-  $horas_trab = round($diffSec / 3600, 2);
+$hora_now = (string)$salidaCalculada["hora_salida"];
+$horas_trab = (float)$salidaCalculada["horas_trabajadas"];
+$salidaEstado = (string)$salidaCalculada["salida_estado"];
+$minutosSalidaTardia =
+  (int)$salidaCalculada["minutos_salida_tardia"];
+$observacionSistema =
+  $salidaCalculada["observacion_sistema"];
 
-  $upd = $pdo->prepare("UPDATE asistencias SET hora_salida=?, horas_trabajadas=? WHERE id=?");
-  $upd->execute([$hora_now, $horas_trab, (int)$asistencia["id"]]);
+$upd = $pdo->prepare("
+  UPDATE asistencias
+  SET hora_salida = ?,
+      horas_trabajadas = ?,
+      salida_estado = ?,
+      minutos_salida_tardia = ?,
+      observacion_sistema = ?
+  WHERE id = ?
+");
 
-  $msg = "Salida registrada: " . $empleado["nombres"] . " " . $empleado["apellidos"];
+$upd->execute([
+  $hora_now,
+  $horas_trab,
+  $salidaEstado,
+  $minutosSalidaTardia,
+  $observacionSistema,
+  (int)$asistencia["id"]
+]);
+
+$msg = "Salida registrada: " . $empleado["nombres"] . " " . $empleado["apellidos"];
   barcode_redirect("", [
     "barcode_msg" => $msg,
     "barcode_type" => "success",
     "ok_asistencia" => "salida",
     "empleado_id" => $empleado_id,
     "estado" => $asistencia["estado"],
-    "hora" => $hora_now
+    "hora" => $hora_now,
+    "salida_estado" => $salidaEstado,
+    "min_salida_tardia" => $minutosSalidaTardia
   ]);
 
 } else {
