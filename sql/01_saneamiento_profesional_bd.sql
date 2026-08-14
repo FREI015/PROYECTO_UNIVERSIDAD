@@ -10,7 +10,7 @@
   - cargos base iniciales.
   - indices para consultas frecuentes.
   - relaciones protegidas para no borrar historial.
-  - trigger para codigos de barra secuenciales (formato EMP + id, 5 digitos).
+  - eliminacion del generador secuencial heredado de codigo de barras.
 */
 
 CREATE DATABASE IF NOT EXISTS control_asistencia
@@ -163,30 +163,14 @@ SET codigo_barra = NULL
 WHERE codigo_barra IS NOT NULL
   AND TRIM(codigo_barra) = '';
 
+-- No generar barcodes predecibles desde SQL.
 UPDATE empleados
-SET codigo_barra = CONCAT('EMP', LPAD(id, 5, '0'))
-WHERE codigo_barra IS NULL
-   OR TRIM(codigo_barra) = ''
-   OR codigo_barra REGEXP '^EMP-';
+SET codigo_barra = NULL
+WHERE codigo_barra IS NOT NULL
+  AND TRIM(codigo_barra) = '';
 
-UPDATE empleados e
-JOIN (
-  SELECT id
-  FROM (
-    SELECT e1.id
-    FROM empleados e1
-    JOIN (
-      SELECT codigo_barra, MIN(id) AS id_conservar
-      FROM empleados
-      WHERE codigo_barra IS NOT NULL
-      GROUP BY codigo_barra
-      HAVING COUNT(*) > 1
-    ) repetidos
-      ON repetidos.codigo_barra = e1.codigo_barra
-    WHERE e1.id <> repetidos.id_conservar
-  ) x
-) d ON d.id = e.id
-SET e.codigo_barra = CONCAT('EMP', LPAD(e.id, 5, '0'));
+-- Los duplicados deben corregirse mediante una migracion controlada en PHP
+-- para producir valores aleatorios unicos con random_bytes().
 
 CALL add_unique_single_column_if_missing(
   'empleados',
@@ -272,20 +256,7 @@ CALL add_fk_if_missing(
   'ALTER TABLE reposos ADD CONSTRAINT fk_reposo_usuario FOREIGN KEY (creado_por) REFERENCES usuarios(id) ON DELETE SET NULL ON UPDATE CASCADE'
 );
 
-DELIMITER $$
-
-DROP TRIGGER IF EXISTS trg_empleados_codigo_barra_bi$$
-
-CREATE TRIGGER trg_empleados_codigo_barra_bi
-BEFORE INSERT ON empleados
-FOR EACH ROW
-BEGIN
-  IF NEW.codigo_barra IS NULL OR TRIM(NEW.codigo_barra) = '' THEN
-    SET NEW.codigo_barra = CONCAT('EMP', LPAD(COALESCE((SELECT MAX(id) + 1 FROM empleados), 1), 5, '0'));
-  END IF;
-END$$
-
-DELIMITER ;
+DROP TRIGGER IF EXISTS trg_empleados_codigo_barra_bi;
 
 DROP PROCEDURE IF EXISTS add_column_if_missing;
 DROP PROCEDURE IF EXISTS add_index_if_missing;

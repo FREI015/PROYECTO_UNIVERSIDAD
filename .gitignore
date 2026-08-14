@@ -73,3 +73,6 @@ includes/conexion.php
 # Permitir archivos de seguridad dentro de uploads
 !uploads/.htaccess
 !uploads/empleados/.htaccess
+
+# Seguridad: no versionar volcados con datos reales
+sql/control_asistencia_completa.sql

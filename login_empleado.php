@@ -46,30 +46,6 @@ if (
     $stmtOk->fetch(PDO::FETCH_ASSOC) ?: null;
 }
 
-$ultimos = [];
-try {
-  $stmt = $pdo->prepare("
-    SELECT
-      CONCAT(e.nombres, ' ', e.apellidos) AS nombre,
-      e.cedula,
-      e.codigo_barra,
-      a.hora_entrada,
-      a.hora_salida,
-      a.estado,
-      a.minutos_tarde,
-      a.horas_trabajadas,
-      a.fecha
-    FROM asistencias a
-    JOIN empleados e ON e.id = a.empleado_id
-    WHERE a.fecha = ?
-    ORDER BY a.creado_en DESC
-    LIMIT 10
-  ");
-  $stmt->execute([$hoy]);
-  $ultimos = $stmt->fetchAll(PDO::FETCH_ASSOC);
-} catch (Throwable $e) {
-  $ultimos = [];
-}
 ?><!DOCTYPE html>
 <html lang="es">
 <head>
@@ -247,64 +223,7 @@ try {
     }
     .kiosk-btn:hover{filter:brightness(1.06)}
     .kiosk-btn:active{filter:brightness(.96)}
-
-    .kiosk-history{
-      margin-top:8px;
-    }
-    .kiosk-history h2{
-      font-size:15px;
-      font-weight:900;
-      color:#374151;
-      margin-bottom:12px;
-      display:flex;
-      align-items:center;
-      gap:8px;
-    }
-    .kiosk-history h2 span{
-      font-size:12px;
-      font-weight:700;
-      color:#9ca3af;
-    }
-    .kiosk-table{
-      width:100%;
-      border-collapse:collapse;
-    }
-    .kiosk-table th{
-      text-align:left;
-      font-size:11px;
-      font-weight:900;
-      color:#9ca3af;
-      text-transform:uppercase;
-      letter-spacing:.04em;
-      padding:0 0 8px;
-    }
-    .kiosk-table td{
-      padding:10px 0;
-      border-bottom:1px solid #f3f4f6;
-      font-size:13px;
-      color:#374151;
-    }
-    .kiosk-table tr:last-child td{border-bottom:none}
-    .kiosk-badge{
-      display:inline-block;
-      padding:3px 8px;
-      border-radius:8px;
-      font-size:11px;
-      font-weight:900;
-    }
-    .kiosk-badge.ok{background:#dcfce7;color:#166534}
-    .kiosk-badge.late{background:#fef3c7;color:#92400e}
-    .kiosk-badge.in{background:#dbeafe;color:#1d4ed8}
-    .kiosk-badge.out{background:#f3e8ff;color:#6b21a8}
-
-    .kiosk-empty{
-      text-align:center;
-      color:#9ca3af;
-      font-size:13px;
-      padding:24px 0;
-    }
-
-    .kiosk-back{
+.kiosk-back{
       text-align:center;
       margin-top:20px;
     }
@@ -455,41 +374,6 @@ try {
       </form>
     </div>
 
-    <div class="kiosk-history">
-      <h2>&Uacute;ltimos registros <span>(hoy)</span></h2>
-      <?php if (!$ultimos): ?>
-        <div class="kiosk-empty">No hay registros de asistencia hoy.</div>
-      <?php else: ?>
-        <table class="kiosk-table">
-          <thead>
-            <tr>
-              <th>Empleado</th>
-              <th>Entrada</th>
-              <th>Salida</th>
-              <th>Estado</th>
-            </tr>
-          </thead>
-          <tbody>
-            <?php foreach ($ultimos as $r): ?>
-              <?php
-                $estadoClase = "ok";
-                $estadoTexto = "A tiempo";
-                if (strtoupper($r["estado"] ?? "") === "RETARDO") {
-                  $estadoClase = "late";
-                  $estadoTexto = "Retardo " . (int)($r["minutos_tarde"] ?? 0) . "min";
-                }
-              ?>
-              <tr>
-                <td><strong><?php echo e($r["nombre"] ?? ""); ?></strong></td>
-                <td><?php echo e($r["hora_entrada"] ?? "—"); ?></td>
-                <td><?php echo e($r["hora_salida"] ?? "—"); ?></td>
-                <td><span class="kiosk-badge <?php echo e($estadoClase); ?>"><?php echo e($estadoTexto); ?></span></td>
-              </tr>
-            <?php endforeach; ?>
-          </tbody>
-        </table>
-      <?php endif; ?>
-    </div>
 
     <div class="kiosk-back">
       <a href="<?php echo e(BASE_URL); ?>/index.php">Volver al inicio</a>

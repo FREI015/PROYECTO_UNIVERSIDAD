@@ -256,7 +256,7 @@ function crearEmpleadosPrueba(PDO $pdo, int $n): array {
     try {
         for ($i = 1; $i <= $n; $i++) {
             $ced   = PREF_CEDULA . str_pad((string)$i, 6, '0', STR_PAD_LEFT);
-            $bar   = PREF_BARRA . 'EMP' . str_pad((string)$i, 5, '0', STR_PAD_LEFT);
+            $bar   = PREF_BARRA . strtoupper(bin2hex(random_bytes(12)));
             $cargo = $cargoIds[$i % count($cargoIds)];
             $turno = $turnoIds[$i % count($turnoIds)];
             $ins->execute([$ced, 'Prueba' . $i, $bar, $cargo, $turno]);

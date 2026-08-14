@@ -998,6 +998,184 @@ function registrarIntentoRecuperacion(
   return
     (int)$pdo->lastInsertId();
 }
+
+/**
+ * ============================================================
+ * BLOQUE 11B - RATE LIMIT LOGIN ADMINISTRATIVO
+ * ============================================================
+ */
+
+function normalizarUsuarioLogin(string $usuario): string {
+  $usuario = strtolower(trim($usuario));
+
+  if (strlen($usuario) > 50) {
+    $usuario = substr($usuario, 0, 50);
+  }
+
+  return $usuario;
+}
+
+function ipClienteLogin(): string {
+  return normalizarIpRecuperacion(
+    (string)($_SERVER["REMOTE_ADDR"] ?? "")
+  );
+}
+
+function loginPermitidoPorConteos(
+  int $fallosUsuarioIp,
+  int $fallosIp,
+  int $limiteUsuarioIp = 5,
+  int $limiteIp = 20
+): bool {
+  return
+    $fallosUsuarioIp < max(1, $limiteUsuarioIp)
+    &&
+    $fallosIp < max(1, $limiteIp);
+}
+
+function estadoRateLimitLogin(
+  PDO $pdo,
+  string $usuario,
+  string $ip,
+  ?DateTimeImmutable $ahora = null,
+  int $limiteUsuarioIp = 5,
+  int $limiteIp = 20,
+  int $ventanaMinutos = 15
+): array {
+  $usuario = normalizarUsuarioLogin($usuario);
+  $ip = normalizarIpRecuperacion($ip);
+  $ventanaMinutos = max(1, $ventanaMinutos);
+
+  if ($ahora === null) {
+    $zona = date_default_timezone_get();
+
+    if ($zona === "") {
+      $zona = "America/Caracas";
+    }
+
+    $ahora = new DateTimeImmutable(
+      "now",
+      new DateTimeZone($zona)
+    );
+  }
+
+  $desde = $ahora
+    ->modify("-" . $ventanaMinutos . " minutes")
+    ->format("Y-m-d H:i:s");
+
+  $stmt = $pdo->prepare("
+    SELECT COUNT(*)
+    FROM login_intentos
+    WHERE
+      exitoso = 0
+      AND usuario = ?
+      AND ip = ?
+      AND creado_en >= ?
+  ");
+
+  $stmt->execute([
+    $usuario,
+    $ip,
+    $desde
+  ]);
+
+  $fallosUsuarioIp = (int)$stmt->fetchColumn();
+
+  $stmt = $pdo->prepare("
+    SELECT COUNT(*)
+    FROM login_intentos
+    WHERE
+      exitoso = 0
+      AND ip = ?
+      AND creado_en >= ?
+  ");
+
+  $stmt->execute([
+    $ip,
+    $desde
+  ]);
+
+  $fallosIp = (int)$stmt->fetchColumn();
+
+  return [
+    "permitido" => loginPermitidoPorConteos(
+      $fallosUsuarioIp,
+      $fallosIp,
+      $limiteUsuarioIp,
+      $limiteIp
+    ),
+    "fallos_usuario_ip" => $fallosUsuarioIp,
+    "fallos_ip" => $fallosIp,
+    "limite_usuario_ip" => max(1, $limiteUsuarioIp),
+    "limite_ip" => max(1, $limiteIp),
+    "ventana_minutos" => $ventanaMinutos,
+    "desde" => $desde,
+  ];
+}
+
+function registrarIntentoLogin(
+  PDO $pdo,
+  string $usuario,
+  string $ip,
+  bool $exitoso
+): int {
+  $stmt = $pdo->prepare("
+    INSERT INTO login_intentos (
+      usuario,
+      ip,
+      exitoso,
+      creado_en
+    )
+    VALUES (?, ?, ?, NOW())
+  ");
+
+  $stmt->execute([
+    normalizarUsuarioLogin($usuario),
+    normalizarIpRecuperacion($ip),
+    $exitoso ? 1 : 0
+  ]);
+
+  return (int)$pdo->lastInsertId();
+}
+
+function limpiarFallosLogin(
+  PDO $pdo,
+  string $usuario,
+  string $ip
+): int {
+  $stmt = $pdo->prepare("
+    DELETE FROM login_intentos
+    WHERE
+      usuario = ?
+      AND ip = ?
+      AND exitoso = 0
+  ");
+
+  $stmt->execute([
+    normalizarUsuarioLogin($usuario),
+    normalizarIpRecuperacion($ip)
+  ]);
+
+  return $stmt->rowCount();
+}
+
+function purgarIntentosLoginAntiguos(
+  PDO $pdo,
+  int $dias = 30
+): int {
+  $dias = max(1, min(365, $dias));
+
+  $sql = "
+    DELETE FROM login_intentos
+    WHERE creado_en < DATE_SUB(
+      NOW(),
+      INTERVAL " . $dias . " DAY
+    )
+  ";
+
+  return (int)$pdo->exec($sql);
+}
+
 function usuarioActual(): array {
   return $_SESSION["user"] ?? [];
 }
@@ -1484,7 +1662,33 @@ function empleadoPorCodigoBarra(PDO $pdo, string $codigo): ?array {
   return $emp ?: null;
 }
 
-function generarCodigoBarra(int $empleadoId): string {
-  return 'EMP' . str_pad((string)$empleadoId, 5, '0', STR_PAD_LEFT);
+function generarCodigoBarra(PDO $pdo): string {
+  for ($intento = 0; $intento < 30; $intento++) {
+    $codigo =
+      "ASIS-" .
+      strtoupper(
+        bin2hex(
+          random_bytes(16)
+        )
+      );
+
+    $stmt = $pdo->prepare("
+      SELECT COUNT(*)
+      FROM empleados
+      WHERE codigo_barra = ?
+    ");
+
+    $stmt->execute([
+      $codigo
+    ]);
+
+    if ((int)$stmt->fetchColumn() === 0) {
+      return $codigo;
+    }
+  }
+
+  throw new RuntimeException(
+    "No se pudo generar un codigo de barras unico."
+  );
 }
 

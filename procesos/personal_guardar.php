@@ -117,21 +117,69 @@ if (isset($_FILES["foto"]) && is_array($_FILES["foto"]) && (int)($_FILES["foto"]
 try {
   $pdo->beginTransaction();
 
+  $codigoBarra = generarCodigoBarra(
+    $pdo
+  );
+
   $ins = $pdo->prepare("
-    INSERT INTO empleados (cedula, nombres, apellidos, telefono, cargo_id, tipo_contrato, turno_id, estado, foto_archivo)
-      VALUES (?, ?, ?, NULL, ?, 'TURNO', ?, 'ACTIVO', ?)
+    INSERT INTO empleados (
+      cedula,
+      nombres,
+      apellidos,
+      telefono,
+      codigo_barra,
+      cargo_id,
+      tipo_contrato,
+      turno_id,
+      estado,
+      foto_archivo
+    )
+    VALUES (
+      ?,
+      ?,
+      ?,
+      NULL,
+      ?,
+      ?,
+      'TURNO',
+      ?,
+      'ACTIVO',
+      ?
+    )
   ");
-  $ins->execute([$cedula, $nombres, $apellidos, $cargo_id, $turno_id, $fotoArchivo]);
 
-  $nuevoEmpleadoId = (int)$pdo->lastInsertId();
+  $ins->execute([
+    $cedula,
+    $nombres,
+    $apellidos,
+    $codigoBarra,
+    $cargo_id,
+    $turno_id,
+    $fotoArchivo
+  ]);
 
-  $codigoBarra = generarCodigoBarra($nuevoEmpleadoId);
-  $upd = $pdo->prepare("UPDATE empleados SET codigo_barra = ? WHERE id = ? AND codigo_barra IS NULL");
-  $upd->execute([$codigoBarra, $nuevoEmpleadoId]);
+  $nuevoEmpleadoId =
+    (int)$pdo->lastInsertId();
+
+  if ($nuevoEmpleadoId <= 0) {
+    throw new RuntimeException(
+      "No se pudo validar el nuevo empleado."
+    );
+  }
 
   $pdo->commit();
 
-  header("Location: " . BASE_URL . "/modulos/personal.php?msg=" . urlencode("Personal registrado exitosamente") . "&ok_personal=1&empleado_id=" . $nuevoEmpleadoId);
+  header(
+    "Location: " .
+    BASE_URL .
+    "/modulos/personal.php?msg=" .
+    urlencode(
+      "Personal registrado exitosamente"
+    ) .
+    "&ok_personal=1&empleado_id=" .
+    $nuevoEmpleadoId
+  );
+
   exit;
 
 } catch (Throwable $e) {
@@ -139,13 +187,31 @@ try {
     $pdo->rollBack();
   }
 
-  if ($fotoArchivo !== null && $fotoArchivo !== "") {
-    $rutaFoto = __DIR__ . "/../" . ltrim((string)$fotoArchivo, "/");
+  if (
+    $fotoArchivo !== null &&
+    $fotoArchivo !== ""
+  ) {
+    $rutaFoto =
+      __DIR__ .
+      "/../" .
+      ltrim(
+        (string)$fotoArchivo,
+        "/"
+      );
+
     if (is_file($rutaFoto)) {
       @unlink($rutaFoto);
     }
   }
 
-  header("Location: " . BASE_URL . "/modulos/personal.php?err=" . urlencode("No se pudo registrar el personal."));
+  header(
+    "Location: " .
+    BASE_URL .
+    "/modulos/personal.php?err=" .
+    urlencode(
+      "No se pudo registrar el personal."
+    )
+  );
+
   exit;
 }
