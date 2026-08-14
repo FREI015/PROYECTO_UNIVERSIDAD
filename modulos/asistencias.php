@@ -812,7 +812,7 @@ tbody td:last-child{
   <?php
     $okNombre = titleCaseEs($okEmpleado["nombre"] ?? "");
     $okFotoArchivo = trim((string)($okEmpleado["foto_archivo"] ?? ""));
-    $okFotoUrl = $okFotoArchivo !== "" ? BASE_URL . "/" . ltrim($okFotoArchivo, "/") : "";
+    $okFotoUrl = fotoEmpleadoUrl($okFotoArchivo);
     $okInicial = strtoupper(substr(trim((string)$okNombre), 0, 1));
 
     if ($okInicial === "") {
@@ -960,7 +960,7 @@ tbody td:last-child{
           $nombre = titleCaseEs($e["nombre"]);
           $turnoNombre = $e["turno_nombre"] ?: "—";
 $fotoArchivo = trim((string)($e["foto_archivo"] ?? ""));
-$fotoUrl = $fotoArchivo !== "" ? BASE_URL . "/" . ltrim($fotoArchivo, "/") : "";
+$fotoUrl = fotoEmpleadoUrl($fotoArchivo);
 $inicialFoto = strtoupper(substr(trim((string)$nombre), 0, 1));
 if ($inicialFoto === "") {
   $inicialFoto = "—";

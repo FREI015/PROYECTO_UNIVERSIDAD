@@ -8,6 +8,43 @@ date_default_timezone_set("America/Caracas");
 $hoy = date("Y-m-d");
 $barcode_msg = trim($_GET["barcode_msg"] ?? "");
 $barcode_type = trim($_GET["barcode_type"] ?? "");
+$okAsistencia = trim($_GET["ok_asistencia"] ?? "");
+$okEmpleadoId = (int)($_GET["empleado_id"] ?? 0);
+$okEstado = trim($_GET["estado"] ?? "");
+$okHora = trim($_GET["hora"] ?? "");
+$okMinTarde = (int)($_GET["min_tarde"] ?? 0);
+$okSalidaEstado = trim($_GET["salida_estado"] ?? "");
+$okMinSalidaTardia = (int)($_GET["min_salida_tardia"] ?? 0);
+
+$okEmpleado = null;
+
+if (
+  $barcode_type === "success" &&
+  in_array(
+    $okAsistencia,
+    ["entrada", "salida"],
+    true
+  ) &&
+  $okEmpleadoId > 0
+) {
+  $stmtOk = $pdo->prepare("
+    SELECT
+      id,
+      nombres,
+      apellidos,
+      foto_archivo
+    FROM empleados
+    WHERE id = ?
+    LIMIT 1
+  ");
+
+  $stmtOk->execute([
+    $okEmpleadoId
+  ]);
+
+  $okEmpleado =
+    $stmtOk->fetch(PDO::FETCH_ASSOC) ?: null;
+}
 
 $ultimos = [];
 try {
@@ -101,6 +138,54 @@ try {
       color:#991b1b;
     }
 
+    .kiosk-person{
+      display:flex;
+      align-items:center;
+      gap:16px;
+      padding:16px;
+      margin-bottom:18px;
+      border-radius:18px;
+      background:#f8fafc;
+      border:1px solid #e5e7eb;
+    }
+    .kiosk-person-photo,
+    .kiosk-person-photo-empty{
+      width:76px;
+      height:76px;
+      min-width:76px;
+      border-radius:50%;
+      object-fit:cover;
+      border:3px solid #ffffff;
+      box-shadow:0 4px 14px rgba(15,23,42,.12);
+      background:#e8eef7;
+    }
+    .kiosk-person-photo-empty{
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:30px;
+      font-weight:950;
+      color:#1d4ed8;
+    }
+    .kiosk-person-info{
+      min-width:0;
+    }
+    .kiosk-person-name{
+      color:#111827;
+      font-size:18px;
+      font-weight:950;
+      line-height:1.25;
+      margin-bottom:5px;
+    }
+    .kiosk-person-action{
+      color:#475569;
+      font-size:13px;
+      font-weight:800;
+      line-height:1.5;
+    }
+    .kiosk-person-action strong{
+      color:#0f172a;
+    }
     .kiosk-scanner{
       background:#f8fafc;
       border:2px solid #e9edf4;
@@ -262,6 +347,103 @@ try {
       </div>
     <?php endif; ?>
 
+    <?php if ($okEmpleado): ?>
+      <?php
+        $okNombre = trim(
+          (string)$okEmpleado["nombres"] .
+          " " .
+          (string)$okEmpleado["apellidos"]
+        );
+
+        $okFotoUrl = fotoEmpleadoUrl(
+          $okEmpleado["foto_archivo"] ?? null
+        );
+
+        $okInicial = strtoupper(
+          substr(
+            trim($okNombre),
+            0,
+            1
+          )
+        );
+
+        if ($okInicial === "") {
+          $okInicial = "—";
+        }
+
+        $okAccionTexto =
+          $okAsistencia === "salida"
+            ? "Salida registrada"
+            : "Entrada registrada";
+
+        $okDetalleEstado = "";
+
+        if ($okAsistencia === "entrada") {
+          if (
+            strtoupper($okEstado) === "RETARDO"
+          ) {
+            $okDetalleEstado =
+              "Retardo: " .
+              $okMinTarde .
+              " min";
+          } else {
+            $okDetalleEstado = "A tiempo";
+          }
+        } elseif ($okSalidaEstado !== "") {
+          if (
+            $okSalidaEstado ===
+            "SALIDA_TARDIA"
+          ) {
+            $okDetalleEstado =
+              "Salida tardía: " .
+              $okMinSalidaTardia .
+              " min";
+          } else {
+            $okDetalleEstado =
+              str_replace(
+                "_",
+                " ",
+                $okSalidaEstado
+              );
+          }
+        }
+      ?>
+
+      <div class="kiosk-person">
+        <?php if ($okFotoUrl !== ""): ?>
+          <img
+            class="kiosk-person-photo"
+            src="<?php echo e($okFotoUrl); ?>"
+            alt="Foto de <?php echo e($okNombre); ?>"
+          >
+        <?php else: ?>
+          <div class="kiosk-person-photo-empty">
+            <?php echo e($okInicial); ?>
+          </div>
+        <?php endif; ?>
+
+        <div class="kiosk-person-info">
+          <div class="kiosk-person-name">
+            <?php echo e($okNombre); ?>
+          </div>
+
+          <div class="kiosk-person-action">
+            <strong>
+              <?php echo e($okAccionTexto); ?>
+            </strong>
+
+            <?php if ($okHora !== ""): ?>
+              · <?php echo e($okHora); ?>
+            <?php endif; ?>
+
+            <?php if ($okDetalleEstado !== ""): ?>
+              <br>
+              <?php echo e($okDetalleEstado); ?>
+            <?php endif; ?>
+          </div>
+        </div>
+      </div>
+    <?php endif; ?>
     <div class="kiosk-scanner">
       <label>C&oacute;digo de Barras</label>
       <form class="kiosk-input-wrap" method="POST" action="<?php echo e(BASE_URL); ?>/procesos/asistencia_barcode.php" id="kioskForm">
@@ -350,6 +532,8 @@ try {
         url.searchParams.delete('estado');
         url.searchParams.delete('hora');
         url.searchParams.delete('min_tarde');
+        url.searchParams.delete('salida_estado');
+        url.searchParams.delete('min_salida_tardia');
         window.history.replaceState({}, '', url.toString());
       }
     }

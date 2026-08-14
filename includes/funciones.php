@@ -603,6 +603,62 @@ function calcularSalidaAsistencia(
     "observacion_sistema" => $observacionSistema,
   ];
 }
+function fotoEmpleadoUrl(?string $fotoArchivo): string {
+  $fotoArchivo = trim((string)$fotoArchivo);
+
+  if ($fotoArchivo === "") {
+    return "";
+  }
+
+  $fotoArchivo = str_replace("\\", "/", $fotoArchivo);
+  $fotoArchivo = ltrim($fotoArchivo, "/");
+
+  if (
+    str_contains($fotoArchivo, "\0") ||
+    str_contains($fotoArchivo, "../") ||
+    str_contains($fotoArchivo, "..\\")
+  ) {
+    return "";
+  }
+
+  if (
+    !str_starts_with(
+      $fotoArchivo,
+      "uploads/empleados/"
+    )
+  ) {
+    return "";
+  }
+
+  if (
+    !preg_match(
+      '/\.(jpe?g|png|webp)$/i',
+      $fotoArchivo
+    )
+  ) {
+    return "";
+  }
+
+  $rutaFisica =
+    dirname(__DIR__) .
+    DIRECTORY_SEPARATOR .
+    str_replace(
+      "/",
+      DIRECTORY_SEPARATOR,
+      $fotoArchivo
+    );
+
+  if (!is_file($rutaFisica)) {
+    return "";
+  }
+
+  $segmentos = array_map(
+    "rawurlencode",
+    explode("/", $fotoArchivo)
+  );
+
+  return BASE_URL . "/" . implode("/", $segmentos);
+}
 function empleadoPorCodigoBarra(PDO $pdo, string $codigo): ?array {
   $codigo = trim($codigo);
   if ($codigo === "") return null;
