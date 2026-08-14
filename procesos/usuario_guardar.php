@@ -25,8 +25,19 @@ if (!preg_match('/^[A-Za-z0-9_.-]{3,50}$/', $usuario)) {
   go(BASE_URL . "/modulos/usuarios.php?err=" . urlencode("El usuario debe tener 3 a 50 caracteres y solo letras, numeros, punto, guion o guion bajo."));
 }
 
-if (strlen($clave) < 6) {
-  go(BASE_URL . "/modulos/usuarios.php?err=" . urlencode("La clave debe tener al menos 6 caracteres."));
+$errorPolitica =
+  errorPoliticaClaveUsuario(
+    $clave
+  );
+
+if ($errorPolitica !== "") {
+  go(
+    BASE_URL .
+    "/modulos/usuarios.php?err=" .
+    urlencode(
+      $errorPolitica
+    )
+  );
 }
 
 if ($clave !== $claveConfirmar) {
@@ -55,8 +66,15 @@ if ($stmt->fetch(PDO::FETCH_ASSOC)) {
 $hash = crearHashClaveUsuario($clave);
 
 $stmt = $pdo->prepare("
-  INSERT INTO usuarios (usuario, clave, rol, estado)
-  VALUES (?, ?, ?, ?)
+  INSERT INTO usuarios (
+  usuario,
+  clave,
+  rol,
+  estado,
+  debe_cambiar_clave,
+  clave_actualizada_en
+)
+VALUES (?, ?, ?, ?, 1, NOW())
 ");
 
 $stmt->execute([$usuario, $hash, $rol, $estado]);

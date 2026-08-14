@@ -22,6 +22,14 @@ $offset = ($pagina - 1) * $porPagina;
 $rolesDisponibles = rolesUsuarioDisponibles();
 $estadosDisponibles = estadosUsuarioDisponibles();
 $usuarioActualInfo = usuarioActual();
+
+$restablecimientoClave =
+  $_SESSION["restablecimiento_clave"]
+  ?? null;
+
+unset(
+  $_SESSION["restablecimiento_clave"]
+);
 $usuarioActualId = (int)($usuarioActualInfo["id"] ?? ($_SESSION["usuario_id"] ?? 0));
 $puedeCrearUsuarios = puede("crear_usuarios");
 $puedeCambiarEstadoUsuarios = puede("cambiar_estado_usuarios");
@@ -346,7 +354,62 @@ require_once __DIR__ . "/../includes/header.php";
 
 <div class="usuarios-wrap">
   <div class="card usuarios-card">
-    <div class="usuarios-title">Administracion de usuarios</div>
+        <?php if (is_array($restablecimientoClave)): ?>
+
+      <div
+        style="
+          margin:0 0 18px;
+          padding:16px;
+          border:1px solid #f0c36d;
+          border-radius:12px;
+          background:#fff8e7;
+        "
+      >
+
+        <strong>
+          Clave temporal generada
+        </strong>
+
+        <p style="margin:8px 0;">
+          Usuario:
+          <strong>
+            <?php echo e(
+              (string)(
+                $restablecimientoClave["usuario"]
+                ?? ""
+              )
+            ); ?>
+          </strong>
+        </p>
+
+        <div
+          style="
+            font-size:20px;
+            font-weight:700;
+            letter-spacing:1px;
+            margin:10px 0;
+          "
+        >
+          <code>
+            <?php echo e(
+              (string)(
+                $restablecimientoClave["clave_temporal"]
+                ?? ""
+              )
+            ); ?>
+          </code>
+        </div>
+
+        <p style="margin:8px 0 0;">
+          Copiala y entregala al usuario por un canal seguro.
+          Esta clave temporal solo se muestra una vez.
+          El usuario debera reemplazarla al iniciar sesion.
+        </p>
+
+      </div>
+
+    <?php endif; ?>
+<div class="usuarios-title">Administracion de usuarios</div>
     <p class="usuarios-sub">
       Consulta y administra usuarios, roles y estados del sistema según el alcance de la cuenta actual.
     </p>
@@ -371,7 +434,7 @@ require_once __DIR__ . "/../includes/header.php";
 <div class="create-user-card">
       <div class="create-user-title">Crear usuario</div>
       <p class="create-user-sub">
-        Crea usuarios con clave segura. La clave no se muestra ni queda expuesta en pantalla.
+        Crea usuarios con una clave inicial segura. El usuario debera reemplazarla al iniciar sesion.
       </p>
 
       <form method="POST" action="../procesos/usuario_guardar.php" id="formCrearUsuario">
@@ -385,12 +448,12 @@ require_once __DIR__ . "/../includes/header.php";
 
           <div class="field">
             <label>Clave</label>
-            <input class="input" type="password" name="clave" required minlength="6" autocomplete="new-password" placeholder="Minimo 6 caracteres">
+            <input class="input" type="password" name="clave" required minlength="10" autocomplete="new-password" placeholder="Minimo 10 caracteres, mayuscula, minuscula y numero">
           </div>
 
           <div class="field">
             <label>Confirmar clave</label>
-            <input class="input" type="password" name="clave_confirmar" required minlength="6" autocomplete="new-password">
+            <input class="input" type="password" name="clave_confirmar" required minlength="10" autocomplete="new-password">
           </div>
 
           <div class="field">
@@ -494,7 +557,7 @@ require_once __DIR__ . "/../includes/header.php";
 </div>
 <div class="table-title">Usuarios registrados</div>
     <p class="table-sub">
-      Solo se muestran datos seguros. Las claves no se imprimen ni se exponen.
+      Las claves permanentes no se muestran. Una clave temporal de restablecimiento solo se revela una vez.
     </p>
 
     <table>
@@ -563,14 +626,28 @@ require_once __DIR__ . "/../includes/header.php";
                 <span class="locked-note">Protegido</span>
               <?php endif; ?>
 
-              <?php if ($puedeCambiarClaveUsuarios && $puedeGestionar): ?>
+              <?php if ($puedeCambiarClaveUsuarios && puedeRestablecerAccesoUsuario($u)): ?>
                 <div class="password-users">
-                  <form method="POST" action="../procesos/usuario_clave.php" onsubmit="return confirm('Confirmar cambio de clave del usuario <?php echo e($usuarioNombre); ?>');">
+                  <form
+                    method="POST"
+                    action="../procesos/usuario_clave.php"
+                    style="display:flex;justify-content:flex-end;"
+                    onsubmit="return confirm('Restablecer el acceso del usuario <?php echo e($usuarioNombre); ?>? Se invalidaran sus sesiones abiertas.');"
+                  >
                     <?php echo csrfInput(); ?>
-                    <input type="hidden" name="id" value="<?php echo (int)$u["id"]; ?>">
-                    <input class="input input-mini" type="password" name="clave" minlength="6" required autocomplete="new-password" placeholder="Nueva clave">
-                    <input class="input input-mini" type="password" name="clave_confirmar" minlength="6" required autocomplete="new-password" placeholder="Confirmar">
-                    <button class="btn-action btn-password" type="submit">Cambiar clave</button>
+
+                    <input
+                      type="hidden"
+                      name="id"
+                      value="<?php echo (int)$u["id"]; ?>"
+                    >
+
+                    <button
+                      class="btn-action btn-password"
+                      type="submit"
+                    >
+                      Restablecer acceso
+                    </button>
                   </form>
                 </div>
               <?php endif; ?>
@@ -651,7 +728,7 @@ require_once __DIR__ . "/../includes/header.php";
       if (
         text.indexOf("nueva clave") !== -1 ||
         text.indexOf("confirmar") !== -1 ||
-        text.indexOf("cambiar clave") !== -1 ||
+        text.indexOf("restablecer acceso") !== -1 ||
         text.indexOf("inactivar") !== -1 ||
         text.indexOf("activar") !== -1
       ) {

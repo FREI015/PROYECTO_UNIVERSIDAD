@@ -19,7 +19,7 @@ if ($usuario === "" || $clave === "") {
   go(BASE_URL . "/login.php?err=" . urlencode("Completa usuario y clave") . "&next=" . urlencode($next));
 }
 
-$stmt = $pdo->prepare("SELECT id, usuario, clave, rol, estado FROM usuarios WHERE usuario=? LIMIT 1");
+$stmt = $pdo->prepare("SELECT id, usuario, clave, rol, estado, debe_cambiar_clave, version_sesion FROM usuarios WHERE usuario=? LIMIT 1");
 $stmt->execute([$usuario]);
 $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -49,5 +49,33 @@ $_SESSION["user"] = [
 $_SESSION["usuario_id"] = (int)$user["id"];
 $_SESSION["usuario"]    = (string)$user["usuario"];
 $_SESSION["rol"]        = (string)($user["rol"] ?? "");
+
+$_SESSION["version_sesion"] =
+  max(
+    1,
+    (int)(
+      $user["version_sesion"]
+      ?? 1
+    )
+  );
+
+$_SESSION["debe_cambiar_clave"] =
+  (int)(
+    $user["debe_cambiar_clave"]
+    ?? 0
+  );
+
+if (
+  (int)(
+    $_SESSION["debe_cambiar_clave"]
+    ?? 0
+  ) === 1
+) {
+
+  go(
+    BASE_URL .
+    "/cambiar_clave_obligatoria.php"
+  );
+}
 
 go($next);

@@ -109,17 +109,218 @@ function safeNext($next, $default = ""): string {
   return BASE_URL . "/" . ltrim($next, "/");
 }
 
-function requireLogin() {
-  if (isLogged()) return;
+function cerrarSesionUsuarioSistema(string $mensaje = ""): void {
+  $_SESSION = [];
 
-  $req  = $_SERVER["REQUEST_URI"] ?? (BASE_PATH . "/");
-  $next = BASE_ORIGIN . $req;
+  if (ini_get("session.use_cookies")) {
+    $params = session_get_cookie_params();
 
-  $login = BASE_URL . "/login.php?next=" . urlencode($next);
-  header("Location: " . $login);
+    setcookie(
+      session_name(),
+      "",
+      time() - 42000,
+      $params["path"],
+      $params["domain"],
+      $params["secure"],
+      $params["httponly"]
+    );
+  }
+
+  if (session_status() === PHP_SESSION_ACTIVE) {
+    session_destroy();
+  }
+
+  $url = BASE_URL . "/login.php";
+
+  if ($mensaje !== "") {
+    $url .= "?err=" . urlencode($mensaje);
+  }
+
+  header("Location: " . $url);
   exit;
 }
 
+function esRutaCambioClaveObligatoria(): bool {
+  $script = str_replace(
+    "\\",
+    "/",
+    (string)($_SERVER["SCRIPT_NAME"] ?? "")
+  );
+
+  return str_ends_with(
+    $script,
+    "/cambiar_clave_obligatoria.php"
+  );
+}
+
+function requireLogin() {
+  if (!isLogged()) {
+    $req =
+      $_SERVER["REQUEST_URI"]
+      ?? (BASE_PATH . "/");
+
+    $next =
+      BASE_ORIGIN . $req;
+
+    $login =
+      BASE_URL .
+      "/login.php?next=" .
+      urlencode($next);
+
+    header(
+      "Location: " . $login
+    );
+
+    exit;
+  }
+
+  global
+    $pdo,
+    $conexion,
+    $DB_HOST,
+    $DB_NAME,
+    $DB_USER,
+    $DB_PASS;
+
+  if (
+    !isset($pdo) ||
+    !($pdo instanceof PDO)
+  ) {
+    require_once
+      __DIR__ .
+      "/conexion.php";
+  }
+
+  if (
+    !isset($pdo) ||
+    !($pdo instanceof PDO)
+  ) {
+    cerrarSesionUsuarioSistema(
+      "No se pudo validar la sesion."
+    );
+  }
+
+  $usuarioId = (int)(
+    $_SESSION["user"]["id"]
+    ?? $_SESSION["usuario_id"]
+    ?? 0
+  );
+
+  if ($usuarioId <= 0) {
+
+    cerrarSesionUsuarioSistema(
+      "Sesion invalida. Inicia sesion nuevamente."
+    );
+  }
+
+  $stmt = $pdo->prepare("
+    SELECT
+      id,
+      usuario,
+      rol,
+      estado,
+      debe_cambiar_clave,
+      version_sesion
+    FROM usuarios
+    WHERE id = ?
+    LIMIT 1
+  ");
+
+  $stmt->execute([
+    $usuarioId
+  ]);
+
+  $usuarioDb =
+    $stmt->fetch(
+      PDO::FETCH_ASSOC
+    );
+
+  if (!$usuarioDb) {
+
+    cerrarSesionUsuarioSistema(
+      "La cuenta ya no esta disponible."
+    );
+  }
+
+  $estado =
+    strtoupper(
+      trim(
+        (string)(
+          $usuarioDb["estado"]
+          ?? ""
+        )
+      )
+    );
+
+  if ($estado !== "ACTIVO") {
+
+    cerrarSesionUsuarioSistema(
+      "Usuario inactivo."
+    );
+  }
+
+  $versionDb =
+    max(
+      1,
+      (int)(
+        $usuarioDb["version_sesion"]
+        ?? 1
+      )
+    );
+
+  $versionSesion =
+    (int)(
+      $_SESSION["version_sesion"]
+      ?? 0
+    );
+
+  if (
+    $versionSesion <= 0 ||
+    $versionSesion !== $versionDb
+  ) {
+
+    cerrarSesionUsuarioSistema(
+      "Tu sesion ya no es valida. Inicia sesion nuevamente."
+    );
+  }
+
+  $_SESSION["user"] = [
+    "id" =>
+      (int)$usuarioDb["id"],
+
+    "usuario" =>
+      (string)$usuarioDb["usuario"],
+
+    "rol" =>
+      (string)$usuarioDb["rol"],
+  ];
+
+  $_SESSION["usuario_id"] =
+    (int)$usuarioDb["id"];
+
+  $_SESSION["usuario"] =
+    (string)$usuarioDb["usuario"];
+
+  $_SESSION["rol"] =
+    (string)$usuarioDb["rol"];
+
+  $_SESSION["debe_cambiar_clave"] =
+    (int)(
+      $usuarioDb["debe_cambiar_clave"]
+      ?? 0
+    );
+
+  if (
+    $_SESSION["debe_cambiar_clave"] === 1 &&
+    !esRutaCambioClaveObligatoria()
+  ) {
+
+    go(
+      BASE_URL .
+      "/cambiar_clave_obligatoria.php"
+    );
+  }
+}
 function formatCedula($cedula) {
   $cedula = (string)$cedula;
   if (!is_numeric($cedula) || $cedula === "") return $cedula;
@@ -182,6 +383,225 @@ function crearHashClaveUsuario(string $clave): string {
 }
 
 
+function generarClaveTemporalUsuario(int $longitud = 16): string {
+  $longitud =
+    max(
+      12,
+      $longitud
+    );
+
+  $mayusculas =
+    "ABCDEFGHJKLMNPQRSTUVWXYZ";
+
+  $minusculas =
+    "abcdefghijkmnopqrstuvwxyz";
+
+  $numeros =
+    "23456789";
+
+  $simbolos =
+    "!@#$%*-_";
+
+  $todos =
+    $mayusculas .
+    $minusculas .
+    $numeros .
+    $simbolos;
+
+  $caracteres = [
+    $mayusculas[
+      random_int(
+        0,
+        strlen($mayusculas) - 1
+      )
+    ],
+
+    $minusculas[
+      random_int(
+        0,
+        strlen($minusculas) - 1
+      )
+    ],
+
+    $numeros[
+      random_int(
+        0,
+        strlen($numeros) - 1
+      )
+    ],
+
+    $simbolos[
+      random_int(
+        0,
+        strlen($simbolos) - 1
+      )
+    ],
+  ];
+
+  while (
+    count($caracteres)
+    < $longitud
+  ) {
+
+    $caracteres[] =
+      $todos[
+        random_int(
+          0,
+          strlen($todos) - 1
+        )
+      ];
+  }
+
+  for (
+    $i =
+      count($caracteres) - 1;
+
+    $i > 0;
+
+    $i--
+  ) {
+
+    $j =
+      random_int(
+        0,
+        $i
+      );
+
+    [
+      $caracteres[$i],
+      $caracteres[$j]
+    ] = [
+      $caracteres[$j],
+      $caracteres[$i]
+    ];
+  }
+
+  return implode(
+    "",
+    $caracteres
+  );
+}
+
+function errorPoliticaClaveUsuario(string $clave): string {
+  if (strlen($clave) < 10) {
+
+    return
+      "La nueva clave debe tener al menos 10 caracteres.";
+  }
+
+  if (
+    !preg_match(
+      '/[A-Z]/',
+      $clave
+    )
+  ) {
+
+    return
+      "La nueva clave debe incluir al menos una letra mayuscula.";
+  }
+
+  if (
+    !preg_match(
+      '/[a-z]/',
+      $clave
+    )
+  ) {
+
+    return
+      "La nueva clave debe incluir al menos una letra minuscula.";
+  }
+
+  if (
+    !preg_match(
+      '/[0-9]/',
+      $clave
+    )
+  ) {
+
+    return
+      "La nueva clave debe incluir al menos un numero.";
+  }
+
+  return "";
+}
+
+function puedeRestablecerAccesoUsuario(?array $usuarioObjetivo): bool {
+  if (!$usuarioObjetivo) {
+    return false;
+  }
+
+  $rolActor =
+    strtoupper(
+      trim(
+        (string)rolActual()
+      )
+    );
+
+  if (
+    !in_array(
+      $rolActor,
+      [
+        "DIRECTORA",
+        "SUBDIRECTOR"
+      ],
+      true
+    )
+  ) {
+    return false;
+  }
+
+  $rolObjetivo =
+    strtoupper(
+      trim(
+        (string)(
+          $usuarioObjetivo["rol"]
+          ?? ""
+        )
+      )
+    );
+
+  if (
+    !in_array(
+      $rolObjetivo,
+      [
+        "DIURNO",
+        "TARDE"
+      ],
+      true
+    )
+  ) {
+    return false;
+  }
+
+  $estadoObjetivo =
+    strtoupper(
+      trim(
+        (string)(
+          $usuarioObjetivo["estado"]
+          ?? ""
+        )
+      )
+    );
+
+  if (
+    $estadoObjetivo !== "ACTIVO"
+  ) {
+    return false;
+  }
+
+  if (
+    !puede(
+      "cambiar_clave_usuarios"
+    )
+  ) {
+    return false;
+  }
+
+  return
+    puedeGestionarUsuarioActual(
+      $usuarioObjetivo
+    );
+}
 function usuarioActual(): array {
   return $_SESSION["user"] ?? [];
 }

@@ -37,7 +37,7 @@ if ($accion === "activar") {
 
 
   $stmt = $pdo->prepare(
-    "SELECT id, usuario, clave, rol, estado FROM usuarios
+    "SELECT id, usuario, clave, rol, estado, debe_cambiar_clave FROM usuarios
      WHERE rol IN ('DIRECTORA','SUBDIRECTOR') AND usuario = ? LIMIT 1"
   );
   $stmt->execute([$usuario]);
@@ -50,6 +50,21 @@ if ($accion === "activar") {
   $estado = strtoupper(trim((string)($user["estado"] ?? "")));
   if ($estado !== "ACTIVO") {
     go(BASE_URL . "/modulos/asistencias.php?err=" . urlencode("El administrador está inactivo"));
+  }
+
+  if (
+    (int)(
+      $user["debe_cambiar_clave"]
+      ?? 0
+    ) === 1
+  ) {
+    go(
+      BASE_URL .
+      "/modulos/asistencias.php?err=" .
+      urlencode(
+        "El administrador debe completar el cambio obligatorio de clave antes de autorizar el modo emergencia."
+      )
+    );
   }
 
   // Validar clave usando el mismo flujo seguro del login.
