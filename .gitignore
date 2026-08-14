@@ -76,3 +76,6 @@ includes/conexion.php
 
 # Seguridad: no versionar volcados con datos reales
 sql/control_asistencia_completa.sql
+
+# Herramientas locales de prueba
+pruebas_generacion.php
