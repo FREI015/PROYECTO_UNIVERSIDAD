@@ -73,6 +73,13 @@ if ($tieneAlcanceGlobal) {
   $turnoIdsPermitidos = array_map("intval", array_column($turnos, "id"));
 }
 
+if (!$tieneAlcanceGlobal) {
+  $turnoFiltro =
+    count($turnoIdsPermitidos) === 1
+      ? (string)$turnoIdsPermitidos[0]
+      : "";
+}
+
 function statusClass($status) {
   switch ($status) {
     case "En Servicio":      return "status-present";
@@ -882,14 +889,35 @@ tbody td:last-child{
       <option value="SUSPENDIDO" <?php echo $estadoFiltro==="SUSPENDIDO"?"selected":""; ?>>Suspendido</option>
     </select>
 
-    <select class="select" name="turno">
-      <option value="" <?php echo $turnoFiltro==="" ? "selected" : ""; ?>>Todos los turnos</option>
-      <?php foreach ($turnos as $t): ?>
-        <option value="<?php echo (int)$t["id"]; ?>" <?php echo ((string)$turnoFiltro === (string)$t["id"]) ? "selected" : ""; ?>>
-          <?php echo e($t["nombre"]); ?>
-        </option>
-      <?php endforeach; ?>
-    </select>
+    <?php if ($tieneAlcanceGlobal): ?>
+      <select class="select" name="turno">
+        <option value="" <?php echo $turnoFiltro==="" ? "selected" : ""; ?>>Todos los turnos</option>
+        <?php foreach ($turnos as $t): ?>
+          <option value="<?php echo (int)$t["id"]; ?>" <?php echo ((string)$turnoFiltro === (string)$t["id"]) ? "selected" : ""; ?>>
+            <?php echo e($t["nombre"]); ?>
+          </option>
+        <?php endforeach; ?>
+      </select>
+    <?php elseif (count($turnos) === 1): ?>
+      <input type="hidden" name="turno" value="<?php echo (int)$turnos[0]["id"]; ?>">
+      <div>
+        <select
+          class="select"
+          disabled
+          aria-label="Turno fijado por tu rol"
+          title="Tu rol solo puede consultar este turno"
+        >
+          <option selected><?php echo e($turnos[0]["nombre"]); ?></option>
+        </select>
+        <small style="display:block;margin-top:5px;color:#64748b;font-size:11px;font-weight:800;">
+          Turno fijado por tu rol
+        </small>
+      </div>
+    <?php else: ?>
+      <select class="select" disabled aria-label="Sin turno disponible">
+        <option selected>Sin turno disponible</option>
+      </select>
+    <?php endif; ?>
 
     <input class="input" type="date" name="desde" value="<?php echo e($desde); ?>" title="Desde (última asistencia)">
     <input class="input" type="date" name="hasta" value="<?php echo e($hasta); ?>" title="Hasta (última asistencia)">

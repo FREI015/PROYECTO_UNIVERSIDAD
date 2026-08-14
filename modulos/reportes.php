@@ -77,6 +77,11 @@ if ($tieneAlcanceGlobal) {
   $turnoIdsPermitidos = array_map("intval", array_column($turnos, "id"));
 }
 
+$turnoBloqueado =
+  (!$tieneAlcanceGlobal && count($turnos) === 1)
+    ? $turnos[0]
+    : null;
+
 // Empleados disponibles para reporte individual.
 $empleados = $pdo->query("
   SELECT e.id, CONCAT(e.nombres,' ',e.apellidos) AS nombre, e.cedula, c.nombre AS cargo
@@ -149,12 +154,31 @@ function eopt($v){ return htmlspecialchars((string)$v, ENT_QUOTES, "UTF-8"); }
 
       <div>
         <label style="font-weight:900;font-size:12px;color:#6b7280;">Turno</label>
-        <select class="select" name="turno_id">
-          <option value="">Todos</option>
-          <?php foreach($turnos as $t): ?>
-            <option value="<?php echo (int)$t["id"]; ?>"><?php echo eopt($t["nombre"]); ?></option>
-          <?php endforeach; ?>
-        </select>
+        <?php if ($tieneAlcanceGlobal): ?>
+          <select class="select" name="turno_id">
+            <option value="">Todos</option>
+            <?php foreach($turnos as $t): ?>
+              <option value="<?php echo (int)$t["id"]; ?>"><?php echo eopt($t["nombre"]); ?></option>
+            <?php endforeach; ?>
+          </select>
+        <?php elseif ($turnoBloqueado): ?>
+          <input type="hidden" name="turno_id" value="<?php echo (int)$turnoBloqueado["id"]; ?>">
+          <select
+            class="select"
+            disabled
+            aria-label="Turno fijado por tu rol"
+            title="Tu rol solo puede generar reportes de este turno"
+          >
+            <option selected><?php echo eopt($turnoBloqueado["nombre"]); ?></option>
+          </select>
+          <small style="display:block;margin-top:5px;color:#64748b;font-size:11px;font-weight:800;">
+            Turno fijado por tu rol
+          </small>
+        <?php else: ?>
+          <select class="select" disabled aria-label="Sin turno disponible">
+            <option selected>Sin turno disponible</option>
+          </select>
+        <?php endif; ?>
       </div>
 
       <div style="display:flex;gap:10px;align-items:end;">
