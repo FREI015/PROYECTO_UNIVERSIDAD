@@ -23,6 +23,7 @@ require_once __DIR__ . "/../includes/funciones.php";
 requireLogin();
 require_once __DIR__ . "/../includes/conexion.php";
 requirePermiso("ver_reportes", BASE_URL . "/modulos/reportes.php");
+marcarAsistenciasSinSalidaVencidas($pdo);
 
 function reportePdfParamEntero(array $keys): ?int {
   foreach ($keys as $key) {

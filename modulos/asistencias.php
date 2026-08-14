@@ -6,6 +6,7 @@ requirePermiso("ver_asistencias", BASE_URL . "/login.php");
 require_once __DIR__ . "/../includes/conexion.php";
 
 date_default_timezone_set("America/Caracas");
+marcarAsistenciasSinSalidaVencidas($pdo);
 
 $pageTitle = "Gestión de Asistencias";
 $active = "asistencias";

@@ -55,6 +55,7 @@ function filtrarEmpleadosReporte(PDO $pdo, array $empleados): array {
 }
 
 require_once __DIR__ . "/../includes/conexion.php";
+marcarAsistenciasSinSalidaVencidas($pdo);
 
 $pageTitle = "Reportes";
 $active = "reportes";

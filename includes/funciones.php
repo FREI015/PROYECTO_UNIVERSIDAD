@@ -387,6 +387,144 @@ function usuarioPuedeAccederModuloUsuarios(): bool {
   return puede("ver_usuarios");
 }
 
+function marcarAsistenciasSinSalidaVencidas(
+  PDO $pdo,
+  ?DateTimeImmutable $ahora = null
+): int {
+  $tz = new DateTimeZone("America/Caracas");
+
+  if ($ahora === null) {
+    $ahora = new DateTimeImmutable("now", $tz);
+  }
+
+  $stmt = $pdo->prepare("
+    SELECT
+      a.id,
+      a.fecha,
+      a.hora_entrada,
+      a.observacion_sistema,
+      t.hora_inicio,
+      t.hora_fin
+    FROM asistencias a
+    INNER JOIN empleados e
+      ON e.id = a.empleado_id
+    LEFT JOIN turnos t
+      ON t.id = e.turno_id
+    WHERE
+      a.hora_entrada IS NOT NULL
+      AND a.hora_salida IS NULL
+      AND (
+        a.salida_estado IS NULL
+        OR TRIM(a.salida_estado) = ''
+      )
+      AND a.fecha <= ?
+    ORDER BY a.id
+  ");
+
+  $stmt->execute([
+    $ahora->format("Y-m-d")
+  ]);
+
+  $filas = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+  if (!$filas) {
+    return 0;
+  }
+
+  $actualizadas = 0;
+  $transaccionPropia = !$pdo->inTransaction();
+
+  if ($transaccionPropia) {
+    $pdo->beginTransaction();
+  }
+
+  try {
+    $upd = $pdo->prepare("
+      UPDATE asistencias
+      SET
+        salida_estado = 'SIN_SALIDA',
+        observacion_sistema = ?
+      WHERE
+        id = ?
+        AND hora_salida IS NULL
+        AND (
+          salida_estado IS NULL
+          OR TRIM(salida_estado) = ''
+        )
+    ");
+
+    foreach ($filas as $fila) {
+      $horaInicio = trim(
+        (string)($fila["hora_inicio"] ?? "")
+      );
+
+      $horaFin = trim(
+        (string)($fila["hora_fin"] ?? "")
+      );
+
+      if ($horaFin === "") {
+        continue;
+      }
+
+      $finTurno = new DateTimeImmutable(
+        (string)$fila["fecha"] .
+        " " .
+        $horaFin,
+        $tz
+      );
+
+      if (
+        $horaInicio !== "" &&
+        $horaInicio > $horaFin
+      ) {
+        $finTurno = $finTurno->modify("+1 day");
+      }
+
+      if (
+        $finTurno->getTimestamp() >
+        $ahora->getTimestamp()
+      ) {
+        continue;
+      }
+
+      $nota =
+        "Sin salida registrada al finalizar el turno (" .
+        $horaFin .
+        ").";
+
+      $observacionActual = trim(
+        (string)($fila["observacion_sistema"] ?? "")
+      );
+
+      $observacionNueva =
+        $observacionActual === ""
+          ? $nota
+          : $observacionActual . " | " . $nota;
+
+      $upd->execute([
+        $observacionNueva,
+        (int)$fila["id"]
+      ]);
+
+      $actualizadas += $upd->rowCount();
+    }
+
+    if ($transaccionPropia) {
+      $pdo->commit();
+    }
+  } catch (Throwable $e) {
+    if (
+      $transaccionPropia &&
+      $pdo->inTransaction()
+    ) {
+      $pdo->rollBack();
+    }
+
+    throw $e;
+  }
+
+  return $actualizadas;
+}
 function calcularSalidaAsistencia(
   string $fechaAsistencia,
   string $horaEntrada,
