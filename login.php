@@ -360,6 +360,12 @@ require_once __DIR__ . "/includes/cintillo_institucional.php";
           <div class="login-light-alert"><?php echo e($err); ?></div>
         <?php endif; ?>
 
+        <?php if (($_GET["recuperada"] ?? "") === "1"): ?>
+          <div style="margin:0 0 16px;padding:13px 14px;border-radius:13px;border:1px solid #bbf7d0;background:#f0fdf4;color:#166534;font-size:13px;font-weight:800;line-height:1.5">
+            Clave actualizada correctamente. Ya puedes iniciar sesión con tu nueva clave.
+          </div>
+        <?php endif; ?>
+
         <form class="login-light-form" method="POST" action="<?php echo e($ACTION); ?>" autocomplete="on">
           <?php echo csrfInput(); ?>
           <input type="hidden" name="next" value="<?php echo e($next); ?>">
@@ -392,6 +398,15 @@ require_once __DIR__ . "/includes/cintillo_institucional.php";
 
           <button class="login-light-btn" type="submit">Entrar al sistema</button>
         </form>
+
+        <div style="text-align:center;margin-top:14px">
+          <a
+            href="<?php echo e(BASE_URL); ?>/recuperar_clave.php"
+            style="color:#800020;font-size:13px;font-weight:900;text-decoration:none"
+          >
+            ¿Olvidaste tu clave?
+          </a>
+        </div>
 
         <div class="login-light-note">
           Acceso exclusivo para usuarios registrados. Las funciones disponibles dependen del rol asignado.

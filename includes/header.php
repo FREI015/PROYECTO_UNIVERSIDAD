@@ -180,6 +180,28 @@ $logoutUrl = BASE_URL . "/procesos/logout.php";
     }
     .btn-primary{background:var(--blue);color:#fff;box-shadow:var(--shadow2)}
     .btn-light{background:#eef2f7;color:#111;border-color:#d6dee8}
+
+    .app-recovery-link{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-height:38px;
+      padding:8px 11px;
+      border-radius:11px;
+      color:#fff;
+      text-decoration:none;
+      font-size:12px;
+      font-weight:850;
+      border:1px solid rgba(255,255,255,.25);
+      background:rgba(255,255,255,.10);
+      white-space:nowrap;
+    }
+
+    .app-recovery-link:hover,
+    .app-recovery-link.active{
+      background:#fff;
+      color:#800020;
+    }
   </style>
   <link rel="stylesheet" href="<?php echo e(BASE_URL); ?>/assets/css/app-theme.css?v=1">
 </head>
@@ -247,6 +269,12 @@ require_once __DIR__ . '/cintillo_institucional.php';
         <span class="app-user-role"><?php echo e($headerRolLabel); ?></span>
         <span class="app-user-meta"><?php echo e($headerAlcanceTexto); ?> | <?php echo e($headerFecha); ?></span>
       </span>
+      <a
+        class="app-recovery-link <?php echo $active==='recuperacion'?'active':''; ?>"
+        href="<?php echo e(BASE_URL); ?>/codigos_recuperacion.php"
+      >
+        Codigos de recuperacion
+      </a>
       <a class="app-logout" href="<?php echo e($logoutUrl); ?>">Salir</a>
     </div>
   </div>

@@ -602,6 +602,402 @@ function puedeRestablecerAccesoUsuario(?array $usuarioObjetivo): bool {
       $usuarioObjetivo
     );
 }
+/**
+ * Genera un codigo de recuperacion con dos partes:
+ *
+ * SELECTOR-SECRETO
+ *
+ * - El selector permite localizar un unico registro y no es secreto.
+ * - El secreto tiene aproximadamente 100 bits de entropia.
+ * - Solo el hash del secreto debe persistirse en la BD.
+ */
+function generarCodigoRecuperacionUsuario(): array {
+  $selector =
+    strtoupper(
+      bin2hex(
+        random_bytes(
+          6
+        )
+      )
+    );
+
+  $alfabeto =
+    "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+  $secreto = "";
+
+  for (
+    $i = 0;
+    $i < 20;
+    $i++
+  ) {
+    $secreto .=
+      $alfabeto[
+        random_int(
+          0,
+          strlen($alfabeto) - 1
+        )
+      ];
+  }
+
+  $hash =
+    crearHashCodigoRecuperacionUsuario(
+      $secreto
+    );
+
+  return [
+    "selector" =>
+      $selector,
+
+    "codigo" =>
+      $selector .
+      "-" .
+      $secreto,
+
+    "codigo_hash" =>
+      $hash,
+  ];
+}
+
+/**
+ * Valida y separa un codigo de recuperacion.
+ *
+ * Retorna:
+ * [
+ *   "selector" => "...",
+ *   "secreto" => "..."
+ * ]
+ *
+ * o null si el formato no es valido.
+ */
+function parsearCodigoRecuperacionUsuario(string $codigo): ?array {
+  $codigo =
+    strtoupper(
+      trim(
+        $codigo
+      )
+    );
+
+  if (
+    !preg_match(
+      '/^([A-F0-9]{12})-([A-HJ-NP-Z2-9]{20})$/',
+      $codigo,
+      $partes
+    )
+  ) {
+    return null;
+  }
+
+  return [
+    "selector" =>
+      (string)$partes[1],
+
+    "secreto" =>
+      (string)$partes[2],
+  ];
+}
+
+function crearHashCodigoRecuperacionUsuario(string $secreto): string {
+  $hash =
+    password_hash(
+      $secreto,
+      PASSWORD_DEFAULT
+    );
+
+  if (
+    !is_string(
+      $hash
+    ) ||
+    $hash === ""
+  ) {
+    throw new RuntimeException(
+      "No se pudo proteger el codigo de recuperacion."
+    );
+  }
+
+  return $hash;
+}
+
+function verificarCodigoRecuperacionUsuario(
+  string $secreto,
+  string $hash
+): bool {
+  if (
+    $secreto === "" ||
+    $hash === ""
+  ) {
+    return false;
+  }
+
+  return
+    password_verify(
+      $secreto,
+      $hash
+    );
+}
+
+/**
+ * Los nombres de usuario actuales usan caracteres ASCII.
+ * Normalizamos para que el rate limit no pueda evadirse
+ * cambiando mayusculas/minusculas o agregando espacios.
+ */
+function normalizarUsuarioRecuperacion(string $usuario): string {
+  return
+    strtolower(
+      trim(
+        $usuario
+      )
+    );
+}
+
+/**
+ * Solo se confia en REMOTE_ADDR.
+ *
+ * No se usan X-Forwarded-For / X-Real-IP porque el proyecto
+ * no tiene actualmente un proxy confiable configurado.
+ */
+function normalizarIpRecuperacion(string $ip): string {
+  $ip =
+    trim(
+      $ip
+    );
+
+  if (
+    filter_var(
+      $ip,
+      FILTER_VALIDATE_IP
+    ) === false
+  ) {
+    return "0.0.0.0";
+  }
+
+  return $ip;
+}
+
+function ipClienteRecuperacion(): string {
+  return
+    normalizarIpRecuperacion(
+      (string)(
+        $_SERVER["REMOTE_ADDR"]
+        ?? ""
+      )
+    );
+}
+
+/**
+ * Regla pura de rate limit:
+ * menos de 5 fallos por usuario Y menos de 5 por IP.
+ */
+function recuperacionPermitidaPorConteos(
+  int $fallosUsuario,
+  int $fallosIp,
+  int $limite = 5
+): bool {
+  $limite =
+    max(
+      1,
+      $limite
+    );
+
+  return
+    $fallosUsuario < $limite &&
+    $fallosIp < $limite;
+}
+
+/**
+ * Consulta el estado del rate limit sin modificar la BD.
+ *
+ * Ventana por defecto:
+ * 15 minutos.
+ *
+ * Limite por defecto:
+ * 5 fallos por usuario O por IP.
+ */
+function estadoRateLimitRecuperacion(
+  PDO $pdo,
+  string $usuario,
+  string $ip,
+  ?DateTimeImmutable $ahora = null,
+  int $limite = 5,
+  int $ventanaMinutos = 15
+): array {
+  $usuario =
+    normalizarUsuarioRecuperacion(
+      $usuario
+    );
+
+  $ip =
+    normalizarIpRecuperacion(
+      $ip
+    );
+
+  $limite =
+    max(
+      1,
+      $limite
+    );
+
+  $ventanaMinutos =
+    max(
+      1,
+      $ventanaMinutos
+    );
+
+  if ($ahora === null) {
+    $zonaNombre =
+      date_default_timezone_get();
+
+    if ($zonaNombre === "") {
+      $zonaNombre =
+        "America/Caracas";
+    }
+
+    $ahora =
+      new DateTimeImmutable(
+        "now",
+        new DateTimeZone(
+          $zonaNombre
+        )
+      );
+  }
+
+  $desde =
+    $ahora
+      ->modify(
+        "-" .
+        $ventanaMinutos .
+        " minutes"
+      )
+      ->format(
+        "Y-m-d H:i:s"
+      );
+
+  $stmtUsuario =
+    $pdo->prepare("
+      SELECT COUNT(*)
+      FROM recuperacion_intentos
+      WHERE
+        exitoso = 0
+        AND usuario = ?
+        AND creado_en >= ?
+    ");
+
+  $stmtUsuario->execute([
+    $usuario,
+    $desde
+  ]);
+
+  $fallosUsuario =
+    (int)$stmtUsuario
+      ->fetchColumn();
+
+  $stmtIp =
+    $pdo->prepare("
+      SELECT COUNT(*)
+      FROM recuperacion_intentos
+      WHERE
+        exitoso = 0
+        AND ip = ?
+        AND creado_en >= ?
+    ");
+
+  $stmtIp->execute([
+    $ip,
+    $desde
+  ]);
+
+  $fallosIp =
+    (int)$stmtIp
+      ->fetchColumn();
+
+  return [
+    "permitido" =>
+      recuperacionPermitidaPorConteos(
+        $fallosUsuario,
+        $fallosIp,
+        $limite
+      ),
+
+    "fallos_usuario" =>
+      $fallosUsuario,
+
+    "fallos_ip" =>
+      $fallosIp,
+
+    "limite" =>
+      $limite,
+
+    "ventana_minutos" =>
+      $ventanaMinutos,
+
+    "desde" =>
+      $desde,
+  ];
+}
+
+/**
+ * Registra solamente:
+ * - usuario normalizado
+ * - IP validada
+ * - exito/fallo
+ * - fecha
+ *
+ * Nunca recibe ni almacena el codigo de recuperacion.
+ */
+function registrarIntentoRecuperacion(
+  PDO $pdo,
+  string $usuario,
+  string $ip,
+  bool $exitoso
+): int {
+  $usuario =
+    normalizarUsuarioRecuperacion(
+      $usuario
+    );
+
+  $ip =
+    normalizarIpRecuperacion(
+      $ip
+    );
+
+  if (
+    strlen(
+      $usuario
+    ) > 50
+  ) {
+    $usuario =
+      substr(
+        $usuario,
+        0,
+        50
+      );
+  }
+
+  $stmt =
+    $pdo->prepare("
+      INSERT INTO recuperacion_intentos (
+        usuario,
+        ip,
+        exitoso,
+        creado_en
+      )
+      VALUES (
+        ?,
+        ?,
+        ?,
+        NOW()
+      )
+    ");
+
+  $stmt->execute([
+    $usuario,
+    $ip,
+    $exitoso ? 1 : 0
+  ]);
+
+  return
+    (int)$pdo->lastInsertId();
+}
 function usuarioActual(): array {
   return $_SESSION["user"] ?? [];
 }

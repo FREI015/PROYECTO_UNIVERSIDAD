@@ -52,6 +52,32 @@ CREATE TABLE IF NOT EXISTS usuarios (
   creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
+CREATE TABLE IF NOT EXISTS usuario_codigos_recuperacion (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  usuario_id INT NOT NULL,
+  selector CHAR(12) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  codigo_hash VARCHAR(255) NOT NULL,
+  creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  usado_en DATETIME NULL DEFAULT NULL,
+  revocado_en DATETIME NULL DEFAULT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_ucr_selector (selector),
+  KEY idx_ucr_usuario_estado (usuario_id, usado_en, revocado_en),
+  CONSTRAINT fk_ucr_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS recuperacion_intentos (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  usuario VARCHAR(50) NOT NULL,
+  ip VARCHAR(45) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  exitoso TINYINT(1) NOT NULL DEFAULT 0,
+  creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_ri_usuario_fallo_fecha (usuario, exitoso, creado_en),
+  KEY idx_ri_ip_fallo_fecha (ip, exitoso, creado_en),
+  KEY idx_ri_creado_en (creado_en)
+) ENGINE=InnoDB;
+
 CREATE TABLE IF NOT EXISTS asistencias (
   id INT AUTO_INCREMENT PRIMARY KEY,
   empleado_id INT NOT NULL,
