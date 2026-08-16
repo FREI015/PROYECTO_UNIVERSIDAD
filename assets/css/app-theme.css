@@ -2420,7 +2420,6 @@ tbody td{
   - un solo bloque visual
   - filtros en jerarquia clara
   - auto-filtrado
-  - modo emergencia integrado
 */
 
 .attendance-filter-panel,
@@ -2603,38 +2602,6 @@ tbody td{
   border-color:#CBD2EA !important;
 }
 
-.attendance-emergency-action,
-.btn-emergency,
-button.btn-emergency,
-a.btn-emergency{
-  min-height:44px !important;
-  display:inline-flex !important;
-  align-items:center !important;
-  justify-content:center !important;
-  padding:10px 16px !important;
-  border-radius:16px !important;
-  background:#FFFFFF !important;
-  border:1px solid #EBCACA !important;
-  color:#974848 !important;
-  font-size:13px !important;
-  font-weight:950 !important;
-  text-decoration:none !important;
-  box-shadow:0 7px 16px rgba(151,72,72,.08) !important;
-  white-space:nowrap !important;
-}
-
-.attendance-emergency-action:hover,
-.btn-emergency:hover{
-  background:#FFF7F7 !important;
-}
-
-.attendance-emergency-action.active,
-.btn-emergency.active{
-  background:#FFF1F1 !important;
-  border-color:#EBCACA !important;
-  color:#974848 !important;
-}
-
 .attendance-duplicate-clear{
   display:none !important;
 }
@@ -2667,16 +2634,6 @@ a.btn-emergency{
   .attendance-order-group{
     flex-wrap:wrap !important;
   }
-}
-
-.attendance-emergency-wrapper{
-  margin:0 !important;
-  display:inline-flex !important;
-}
-
-.attendance-emergency-wrapper button,
-.attendance-emergency-wrapper a{
-  margin:0 !important;
 }
 
 .attendance-filter-panel .attendance-filter-grid > br,
@@ -5671,4 +5628,12 @@ form.reposos-form-modern .grid > *:has(input[type="submit"]){
     padding-left:8px !important;
     padding-right:8px !important;
   }
+}
+
+/* Campos obligatorios: asterisco reutilizable */
+label.req::after,
+.form-label.req::after{
+  content:" *";
+  color:#dc2626;
+  font-weight:900;
 }

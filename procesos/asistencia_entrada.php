@@ -88,24 +88,19 @@ if (!puedeVerTurno($emp["turno_nombre"] ?? "")) {
     header("Location: " . asistenciaReturnUrl("err", "No tienes permiso para marcar asistencia de este turno"));
     exit;
 }
-// Modo emergencia: omite restricciones de reposo y permiso.
-$modoEmergencia = !empty($_SESSION['modo_emergencia']);
+// Bloquear si tiene reposo/permiso activo HOY (fecha real).
+$stmt = $pdo->prepare("SELECT id FROM reposos WHERE empleado_id=? AND estado='ACTIVO' AND ? BETWEEN fecha_inicio AND fecha_fin LIMIT 1");
+$stmt->execute([$empleado_id, $hoy_real]);
+if ($stmt->fetch()) {
+  header("Location: " . asistenciaReturnUrl("err", "No puedes marcar: reposo activo"));
+  exit;
+}
 
-// 2) Bloquear si tiene reposo/permiso activo HOY (fecha real) — sauf modo emergencia
-if (!$modoEmergencia) {
-  $stmt = $pdo->prepare("SELECT id FROM reposos WHERE empleado_id=? AND estado='ACTIVO' AND ? BETWEEN fecha_inicio AND fecha_fin LIMIT 1");
-  $stmt->execute([$empleado_id, $hoy_real]);
-  if ($stmt->fetch()) {
-    header("Location: " . asistenciaReturnUrl("err", "No puedes marcar: reposo activo"));
-    exit;
-  }
-
-  $stmt = $pdo->prepare("SELECT id FROM permisos WHERE empleado_id=? AND estado='ACTIVO' AND ? BETWEEN fecha_inicio AND fecha_fin LIMIT 1");
-  $stmt->execute([$empleado_id, $hoy_real]);
-  if ($stmt->fetch()) {
-    header("Location: " . asistenciaReturnUrl("err", "No puedes marcar: permiso activo"));
-    exit;
-  }
+$stmt = $pdo->prepare("SELECT id FROM permisos WHERE empleado_id=? AND estado='ACTIVO' AND ? BETWEEN fecha_inicio AND fecha_fin LIMIT 1");
+$stmt->execute([$empleado_id, $hoy_real]);
+if ($stmt->fetch()) {
+  header("Location: " . asistenciaReturnUrl("err", "No puedes marcar: permiso activo"));
+  exit;
 }
 
 // 3) Calcular retardo según turno + tolerancia (SEGURA)

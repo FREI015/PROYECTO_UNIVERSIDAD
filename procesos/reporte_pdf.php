@@ -597,12 +597,16 @@ if ($detalleExcedido) {
 }
 
 // 5) Crear PDF
-$pdf = new TCPDF("P", "mm", "A4", true, "UTF-8", false);
+// Reporte individual en vertical; reporte general en horizontal para que la tabla resumen no quede comprimida.
+$orientacionPdf = $esIndividual ? "P" : "L";
+$margenPdf = $esIndividual ? 12 : 10;
+
+$pdf = new TCPDF($orientacionPdf, "mm", "A4", true, "UTF-8", false);
 $pdf->SetCreator("Control de Asistencia");
 $pdf->SetAuthor("Sistema Control de Asistencia");
 $pdf->SetTitle("Reporte de Asistencias");
-$pdf->SetMargins(12, 12, 12);
-$pdf->SetAutoPageBreak(true, 12);
+$pdf->SetMargins($margenPdf, $margenPdf, $margenPdf);
+$pdf->SetAutoPageBreak(true, 14);
 $pdf->AddPage();
 reportePdfAgregarCintillo($pdf);
 $pdf->SetFont("helvetica", "", 10);
@@ -624,12 +628,12 @@ if ($esIndividual && count($empleados) > 0) {
 
 $html = '
 <style>
-  h1{font-size:16px;margin:0 0 6px 0;}
-  h2{font-size:12px;margin:12px 0 6px 0;}
-  .meta{font-size:10px;color:#555;line-height:1.35;}
+  h1{font-size:15px;margin:0 0 6px 0;}
+  h2{font-size:11px;margin:12px 0 6px 0;}
+  .meta{font-size:9.5px;color:#555;line-height:1.35;}
   .box{border:1px solid #ddd;padding:8px;border-radius:6px;margin:10px 0;}
   table{width:100%;border-collapse:collapse;}
-  th,td{border:1px solid #ddd;padding:6px;font-size:9.5px;}
+  th,td{border:1px solid #ddd;padding:5px 4px;font-size:9px;word-wrap:break-word;overflow-wrap:break-word;vertical-align:top;}
   th{background:#f3f6fb;font-weight:bold;}
 </style>
 

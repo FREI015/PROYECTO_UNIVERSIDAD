@@ -11,7 +11,11 @@ reposos, usuarios, roles y reportes.
 - Control automatico de SIN_SALIDA.
 - Restriccion de turnos por rol.
 - Gestion de personal, permisos y reposos.
-- Reportes PDF.
+- Codigo de barras manual obligatorio al registrar o editar personal.
+- Edicion de personal desde el listado (modal con datos precargados).
+- Filtros de consulta en Permisos y Reposos (empleado, estado, fechas).
+- Campos obligatorios con asterisco y mensaje.
+- Reportes PDF con escala uniforme.
 - Restablecimiento administrativo limitado.
 - Recuperacion con codigos de un solo uso.
 - Mi perfil y cambio de la propia clave.
@@ -44,28 +48,36 @@ aplicarse a usuarios operativos DIURNO/TARDE.
 - SQL preparado.
 - Directorios internos bloqueados.
 - Uploads sin ejecucion PHP.
-- Barcodes aleatorios generados con random_bytes().
+- Barcodes validados (unicos, sin espacios ni comillas, maximo 50 caracteres).
+- Codigo de barras enmascarado en el listado de Personal.
 
 ## Codigo de barras
 
-Formato actual:
+Desde la version v1.1.0 el codigo se registra manualmente al dar de
+alta o editar un empleado. No se genera automaticamente.
 
-ASIS- + 32 caracteres hexadecimales aleatorios.
+Reglas:
 
-La parte aleatoria proviene de random_bytes(16).
+- obligatorio;
+- mayusculas;
+- maximo 50 caracteres;
+- sin espacios ni comillas;
+- unico entre empleados.
 
-El codigo no depende del ID del empleado y no es secuencial.
+En el listado de Personal se muestra enmascarado
+("****" + ultimos 4 caracteres).
 
 ## Instalacion limpia
 
 1. Clonar el repositorio.
 2. Colocarlo en el servidor local.
 3. Importar `sql/bd.sql`.
-4. Copiar `conexion.example.php` como
+4. Opcional: `sql/00_usuarios_iniciales.sql` crea los 4 usuarios base.
+5. Copiar `conexion.example.php` como
    `includes/conexion.php`.
-5. Configurar las credenciales locales.
-6. Iniciar Apache y MariaDB/MySQL.
-7. Abrir la aplicacion.
+6. Configurar las credenciales locales.
+7. Iniciar Apache y MariaDB/MySQL.
+8. Abrir la aplicacion.
 
 ## Datos reales
 

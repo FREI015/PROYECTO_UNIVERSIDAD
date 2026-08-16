@@ -65,6 +65,10 @@ $sql = "
   FROM usuarios
   $whereSql
   ORDER BY
+    CASE estado
+      WHEN 'ACTIVO' THEN 0
+      ELSE 1
+    END,
     CASE rol
       WHEN 'DIRECTORA' THEN 1
       WHEN 'SUBDIRECTOR' THEN 2

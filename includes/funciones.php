@@ -1196,6 +1196,7 @@ function permisosSistema(): array {
     "marcar_asistencia",
     "ver_personal",
     "crear_personal",
+    "editar_personal",
     "cambiar_estado_personal",
     "ver_permisos",
     "crear_permisos",
@@ -1662,33 +1663,17 @@ function empleadoPorCodigoBarra(PDO $pdo, string $codigo): ?array {
   return $emp ?: null;
 }
 
-function generarCodigoBarra(PDO $pdo): string {
-  for ($intento = 0; $intento < 30; $intento++) {
-    $codigo =
-      "ASIS-" .
-      strtoupper(
-        bin2hex(
-          random_bytes(16)
-        )
-      );
-
-    $stmt = $pdo->prepare("
-      SELECT COUNT(*)
-      FROM empleados
-      WHERE codigo_barra = ?
-    ");
-
-    $stmt->execute([
-      $codigo
-    ]);
-
-    if ((int)$stmt->fetchColumn() === 0) {
-      return $codigo;
-    }
+function enmascararCodigoBarra(string $codigo): string {
+  $codigo = trim($codigo);
+  if ($codigo === "") {
+    return "—";
   }
 
-  throw new RuntimeException(
-    "No se pudo generar un codigo de barras unico."
-  );
+  if (strlen($codigo) <= 4) {
+    return str_repeat("*", strlen($codigo));
+  }
+
+  $visible = substr($codigo, -4);
+  return "****" . $visible;
 }
 

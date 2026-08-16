@@ -10,21 +10,49 @@ if ($_SERVER["REQUEST_METHOD"] !== "POST") {
 }
 
 verifyCsrfOrRedirect(BASE_URL . "/modulos/personal.php?err=" . urlencode("Solicitud inválida. Intenta nuevamente."));
-requirePermiso("crear_personal", BASE_URL . "/modulos/personal.php");
+requirePermiso("editar_personal", BASE_URL . "/modulos/personal.php");
 
+$id = (int)($_POST["id"] ?? 0);
 $nombres   = trim($_POST["nombres"] ?? "");
 $apellidos = trim($_POST["apellidos"] ?? "");
 $cedula    = trim($_POST["cedula"] ?? "");
 $cargo_id  = (int)($_POST["cargo_id"] ?? 0);
 $turno_id  = (int)($_POST["turno_id"] ?? 0);
 $codigoBarra = strtoupper(trim($_POST["codigo_barra"] ?? ""));
+
+if ($id <= 0) {
+  header("Location: " . BASE_URL . "/modulos/personal.php?err=" . urlencode("Empleado inválido"));
+  exit;
+}
+
+// Defensa por turno: solo se puede editar personal de turnos permitidos.
+$stmtEmpScope = $pdo->prepare("
+  SELECT e.turno_id, t.nombre
+  FROM empleados e
+  LEFT JOIN turnos t ON t.id = e.turno_id
+  WHERE e.id = ?
+  LIMIT 1
+");
+$stmtEmpScope->execute([$id]);
+$empScope = $stmtEmpScope->fetch(PDO::FETCH_ASSOC);
+
+if (!$empScope) {
+  header("Location: " . BASE_URL . "/modulos/personal.php?err=" . urlencode("Empleado no existe"));
+  exit;
+}
+
+if (!puedeVerTurno((string)($empScope["nombre"] ?? ""))) {
+  header("Location: " . BASE_URL . "/modulos/personal.php?err=" . urlencode("No tienes permiso para modificar personal de ese turno."));
+  exit;
+}
+
 if ($turno_id > 0) {
   $stmtTurnoScope = $pdo->prepare("SELECT nombre FROM turnos WHERE id = ? LIMIT 1");
   $stmtTurnoScope->execute([$turno_id]);
   $turnoNombreScope = (string)$stmtTurnoScope->fetchColumn();
 
   if (!puedeVerTurno($turnoNombreScope)) {
-    header("Location: " . BASE_URL . "/modulos/personal.php?err=" . urlencode("No tienes permiso para registrar personal en ese turno."));
+    header("Location: " . BASE_URL . "/modulos/personal.php?err=" . urlencode("No tienes permiso para asignar personal a ese turno."));
     exit;
   }
 }
@@ -50,9 +78,9 @@ if (!$stmt->fetch()) {
   exit;
 }
 
-// Evitar duplicado por cédula
-$stmt = $pdo->prepare("SELECT id FROM empleados WHERE cedula=? LIMIT 1");
-$stmt->execute([$cedula]);
+// Evitar duplicado por cédula (excluyendo al mismo empleado)
+$stmt = $pdo->prepare("SELECT id FROM empleados WHERE cedula=? AND id <> ? LIMIT 1");
+$stmt->execute([$cedula, $id]);
 if ($stmt->fetch()) {
   header("Location: " . BASE_URL . "/modulos/personal.php?err=" . urlencode("Ya existe un empleado con esa cédula"));
   exit;
@@ -74,15 +102,20 @@ if (preg_match('/[\s"\']/', $codigoBarra)) {
   exit;
 }
 
-// Evitar duplicado por código de barras
-$stmt = $pdo->prepare("SELECT id FROM empleados WHERE codigo_barra=? LIMIT 1");
-$stmt->execute([$codigoBarra]);
+// Evitar duplicado por código de barras (excluyendo al mismo empleado)
+$stmt = $pdo->prepare("SELECT id FROM empleados WHERE codigo_barra=? AND id <> ? LIMIT 1");
+$stmt->execute([$codigoBarra, $id]);
 if ($stmt->fetch()) {
   header("Location: " . BASE_URL . "/modulos/personal.php?err=" . urlencode("Ya existe un empleado con ese código de barras"));
   exit;
 }
 
 $fotoArchivo = null;
+$fotoPrevia  = null;
+
+$stmtFoto = $pdo->prepare("SELECT foto_archivo FROM empleados WHERE id=? LIMIT 1");
+$stmtFoto->execute([$id]);
+$fotoPrevia = (string)($stmtFoto->fetchColumn() ?: "");
 
 if (isset($_FILES["foto"]) && is_array($_FILES["foto"]) && (int)($_FILES["foto"]["error"] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
     $fotoError = (int)($_FILES["foto"]["error"] ?? UPLOAD_ERR_NO_FILE);
@@ -182,66 +215,48 @@ if (isset($_FILES["foto"]) && is_array($_FILES["foto"]) && (int)($_FILES["foto"]
 
     $fotoArchivo = "uploads/empleados/" . $nombreArchivo;
 }
+
 try {
   $pdo->beginTransaction();
 
-  $ins = $pdo->prepare("
-    INSERT INTO empleados (
-      cedula,
-      nombres,
-      apellidos,
-      telefono,
-      codigo_barra,
-      cargo_id,
-      tipo_contrato,
-      turno_id,
-      estado,
-      foto_archivo
-    )
-    VALUES (
-      ?,
-      ?,
-      ?,
-      NULL,
-      ?,
-      ?,
-      'TURNO',
-      ?,
-      'ACTIVO',
-      ?
-    )
+  $upd = $pdo->prepare("
+    UPDATE empleados
+    SET nombres = ?,
+        apellidos = ?,
+        cedula = ?,
+        cargo_id = ?,
+        turno_id = ?,
+        codigo_barra = ?,
+        foto_archivo = COALESCE(?, foto_archivo)
+    WHERE id = ?
   ");
 
-  $ins->execute([
-    $cedula,
+  $upd->execute([
     $nombres,
     $apellidos,
-    $codigoBarra,
+    $cedula,
     $cargo_id,
     $turno_id,
-    $fotoArchivo
+    $codigoBarra,
+    $fotoArchivo,
+    $id
   ]);
 
-  $nuevoEmpleadoId =
-    (int)$pdo->lastInsertId();
-
-  if ($nuevoEmpleadoId <= 0) {
-    throw new RuntimeException(
-      "No se pudo validar el nuevo empleado."
-    );
-  }
-
   $pdo->commit();
+
+  // Eliminar la foto anterior solo si se reemplazó correctamente.
+  if ($fotoArchivo !== null && $fotoPrevia !== "") {
+    $rutaFotoPrevia = __DIR__ . "/../" . ltrim($fotoPrevia, "/");
+    if (is_file($rutaFotoPrevia)) {
+      @unlink($rutaFotoPrevia);
+    }
+  }
 
   header(
     "Location: " .
     BASE_URL .
     "/modulos/personal.php?msg=" .
-    urlencode(
-      "Personal registrado exitosamente"
-    ) .
-    "&ok_personal=1&empleado_id=" .
-    $nuevoEmpleadoId
+    urlencode("Personal actualizado exitosamente")
   );
 
   exit;
@@ -255,14 +270,7 @@ try {
     $fotoArchivo !== null &&
     $fotoArchivo !== ""
   ) {
-    $rutaFoto =
-      __DIR__ .
-      "/../" .
-      ltrim(
-        (string)$fotoArchivo,
-        "/"
-      );
-
+    $rutaFoto = __DIR__ . "/../" . ltrim($fotoArchivo, "/");
     if (is_file($rutaFoto)) {
       @unlink($rutaFoto);
     }
@@ -272,9 +280,7 @@ try {
     "Location: " .
     BASE_URL .
     "/modulos/personal.php?err=" .
-    urlencode(
-      "No se pudo registrar el personal."
-    )
+    urlencode("No se pudo actualizar el personal.")
   );
 
   exit;

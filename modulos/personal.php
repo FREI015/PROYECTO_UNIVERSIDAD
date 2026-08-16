@@ -8,6 +8,7 @@ require_once __DIR__ . "/../includes/conexion.php";
 $turnosPermitidos = turnosPermitidosPorRol();
 $tieneAlcanceGlobal = tieneAlcanceGlobalTurnos();
 $puedeCrearPersonal = puede("crear_personal");
+$puedeEditarPersonal = puede("editar_personal");
 $puedeCambiarEstadoPersonal = puede("cambiar_estado_personal");
 $turnoIdsPermitidos = [];
 
@@ -65,7 +66,9 @@ if ($tieneAlcanceGlobal) {
 // Filtro por estado.
 $whereEstado = "";
 $paramsTotal = [];
-if ($filtroEstado === "SUSPENDIDO") {
+if ($filtroEstado === "ACTIVO") {
+  $whereEstado = " WHERE estado = 'ACTIVO'";
+} elseif ($filtroEstado === "SUSPENDIDO") {
   $whereEstado = " WHERE estado = 'SUSPENDIDO'";
 } elseif ($filtroEstado === "RETIRADO") {
   $whereEstado = " WHERE estado = 'RETIRADO'";
@@ -116,7 +119,7 @@ if ($orden === "jerarquia") {
 }
 
 $personal = $pdo->prepare("
-  SELECT e.id, e.cedula, e.estado, e.codigo_barra,
+  SELECT e.id, e.cedula, e.estado, e.codigo_barra, e.nombres, e.apellidos, e.cargo_id, e.turno_id, e.foto_archivo,
          CONCAT(
            UCASE(LEFT(TRIM(e.nombres),1)), SUBSTRING(TRIM(e.nombres),2), ' ',
            UCASE(LEFT(TRIM(e.apellidos),1)), SUBSTRING(TRIM(e.apellidos),2)
@@ -267,7 +270,37 @@ require_once __DIR__ . "/../includes/header.php";
 
   table th{ font-weight:700 !important; font-size:12px; }
 
-  .actions-personal{ display:flex; gap:8px; flex-wrap:wrap; }
+  .personal-table-modern{
+    width:100%;
+    table-layout:auto;
+  }
+
+  .personal-table-modern thead th{
+    text-align:left;
+    white-space:normal;
+    line-height:1.25;
+  }
+
+  .personal-table-modern th,
+  .personal-table-modern td{
+    padding:13px 12px;
+  }
+
+  .personal-table-modern tbody td{
+    vertical-align:middle;
+    word-break:break-word;
+    overflow-wrap:break-word;
+  }
+
+  .personal-table-modern tbody td:last-child{
+    white-space:nowrap;
+  }
+
+  .actions-personal{ display:inline-flex; gap:6px; flex-wrap:nowrap; margin:0; vertical-align:middle; }
+  .personal-table-modern .btn-editar{
+    vertical-align:middle;
+    margin-left:2px;
+  }
   .btn-action{
     border:1px solid #d6dee8;
     background:#fff;
@@ -280,6 +313,17 @@ require_once __DIR__ . "/../includes/header.php";
   .btn-activar{ background:#dcfce7; border-color:#bbf7d0; color:#166534; }
   .btn-suspender{ background:#fef3c7; border-color:#fde68a; color:#92400e; }
   .btn-retirar{ background:#fee2e2; border-color:#fecaca; color:#991b1b; }
+  .btn-editar{ background:#e0f2fe; border-color:#bae6fd; color:#075985; }
+
+  .modal-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:9999}
+  .modal-overlay.show{display:flex}
+  .modal-box{background:#fff;border-radius:16px;padding:24px;max-width:760px;width:94%;box-shadow:0 10px 40px rgba(0,0,0,.2);max-height:92vh;overflow-y:auto}
+  .modal-box h3{margin:0 0 4px;font-size:19px}
+  .modal-sub{color:#6b7280;font-size:13px;margin:0 0 16px}
+  .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:18px}
+  .modal-actions .btn-primary{background:#800020;color:#fff;border:0;padding:10px 18px;border-radius:11px;font-weight:800;cursor:pointer}
+  .modal-actions .btn-light{background:#f1f5f9;border:1px solid #d6dee8;color:#334155;padding:10px 18px;border-radius:11px;font-weight:700;cursor:pointer;text-decoration:none}
+  .edit-preview{width:64px;height:64px;border-radius:14px;object-fit:cover;border:1px solid #d6dee8;margin-bottom:8px}
 
   .status-suspended{background:#fef3c7;color:#92400e}
   .status-retired{background:#fee2e2;color:#991b1b}
@@ -321,6 +365,14 @@ require_once __DIR__ . "/../includes/header.php";
     .actions-row{ justify-content:stretch; }
     .actions-row .btn-primary,
     .actions-row .btn-light{ width:100%; }
+
+    .personal-table-modern tbody td:last-child{
+      white-space:normal;
+    }
+
+    .actions-personal{
+      flex-wrap:wrap;
+    }
   }
 </style>
 
@@ -422,6 +474,12 @@ require_once __DIR__ . "/../includes/header.php";
         <small style="display:block;color:#6b7280;margin-top:-6px;margin-bottom:12px">Formatos permitidos: JPG, PNG o WEBP. Máximo 2 MB.</small>
           </div>
 
+          <div class="field span4">
+            <label>Código de Barras</label>
+            <input class="input" name="codigo_barra" id="inputCodigoBarra" required maxlength="50" inputmode="text" placeholder="Ej: ASIS-4F8E...">
+            <small style="display:block;color:#6b7280;margin-top:-6px;margin-bottom:12px">Código del carné. Hasta 50 caracteres, sin espacios.</small>
+          </div>
+
           <div class="span4">
             <div class="actions-row">
               <button class="btn-primary" type="submit">Registrar Personal</button>
@@ -438,7 +496,9 @@ require_once __DIR__ . "/../includes/header.php";
     <div class="card table-card">
       <div class="table-title">Listado de Personal</div>
       <p class="table-sub">
-        <?php if ($filtroEstado === "SUSPENDIDO"): ?>
+        <?php if ($filtroEstado === "ACTIVO"): ?>
+          Personal activo registrado.
+        <?php elseif ($filtroEstado === "SUSPENDIDO"): ?>
           Personal suspendido registrado.
         <?php elseif ($filtroEstado === "RETIRADO"): ?>
           Personal retirado registrado.
@@ -459,6 +519,11 @@ require_once __DIR__ . "/../includes/header.php";
         Orden Alfabético
       </a>
       <div style="border-left:1px solid #d6dee8;margin:0 4px"></div>
+      <a href="<?php echo BASE_URL; ?>/modulos/personal.php?pagina=1&filtro=ACTIVO<?php echo $orden !== '' ? '&orden=' . $orden : ''; ?>" 
+         class="btn <?php echo $filtroEstado === 'ACTIVO' ? 'btn-primary' : 'btn-light'; ?>" 
+         style="font-size:12px;padding:8px 12px">
+        Activos
+      </a>
       <a href="<?php echo BASE_URL; ?>/modulos/personal.php?pagina=1&filtro=SUSPENDIDO<?php echo $orden !== '' ? '&orden=' . $orden : ''; ?>" 
          class="btn <?php echo $filtroEstado === 'SUSPENDIDO' ? 'btn-primary' : 'btn-light'; ?>" 
          style="font-size:12px;padding:8px 12px">
@@ -498,7 +563,7 @@ require_once __DIR__ . "/../includes/header.php";
           <tr>
             <td><?php echo e($p["nombre"]); ?></td>
             <td><?php echo e(formatCedula($p["cedula"])); ?></td>
-            <td><code style="font-size:13px;font-weight:700;letter-spacing:1px"><?php echo e($codigoBarra ?: "—"); ?></code></td>
+            <td><code style="font-size:13px;font-weight:700;letter-spacing:1px"><?php echo e(enmascararCodigoBarra($codigoBarra)); ?></code></td>
             <td><?php echo e($p["cargo"]); ?></td>
             <td><?php echo e($p["turno"] ?: "—"); ?></td>
             <td>
@@ -531,6 +596,17 @@ require_once __DIR__ . "/../includes/header.php";
               </form>
               <?php else: ?>
                 <span class="scope-note">Solo lectura</span>
+              <?php endif; ?>
+              <?php if ($puedeEditarPersonal): ?>
+                <button type="button" class="btn-action btn-editar"
+                  data-id="<?php echo (int)$p["id"]; ?>"
+                  data-nombres="<?php echo e($p["nombres"] ?? ""); ?>"
+                  data-apellidos="<?php echo e($p["apellidos"] ?? ""); ?>"
+                  data-cedula="<?php echo e($p["cedula"] ?? ""); ?>"
+                  data-cargo-id="<?php echo (int)($p["cargo_id"] ?? 0); ?>"
+                  data-turno-id="<?php echo (int)($p["turno_id"] ?? 0); ?>"
+                  data-codigo="<?php echo e($p["codigo_barra"] ?? ""); ?>"
+                  data-foto="<?php echo e($p["foto_archivo"] ?? ""); ?>">Editar</button>
               <?php endif; ?>
             </td>
           </tr>
@@ -565,14 +641,85 @@ require_once __DIR__ . "/../includes/header.php";
 
 </div>
 
+<div class="modal-overlay" id="modalEditarPersonal">
+  <div class="modal-box">
+    <h3>Editar Personal</h3>
+    <p class="modal-sub">Actualiza los datos del empleado. El código de barras es obligatorio.</p>
+    <form method="POST" action="../procesos/personal_actualizar.php" id="formEditarPersonal" enctype="multipart/form-data">
+      <?php echo csrfInput(); ?>
+      <input type="hidden" name="id" id="editId">
+      <div class="grid4">
+
+        <div class="field">
+          <label>Nombres</label>
+          <input class="input" name="nombres" id="editNombres" required>
+        </div>
+
+        <div class="field">
+          <label>Apellidos</label>
+          <input class="input" name="apellidos" id="editApellidos" required>
+        </div>
+
+        <div class="field">
+          <label>Cédula</label>
+          <input class="input" name="cedula" id="editCedula" required inputmode="numeric">
+        </div>
+
+        <div class="field">
+          <label>Cargo</label>
+          <select class="select" name="cargo_id" id="editCargoId" required>
+            <option value="">Seleccione…</option>
+            <?php foreach ($cargos as $c): ?>
+              <option value="<?php echo (int)$c["id"]; ?>"><?php echo e($c["nombre"]); ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+
+        <div class="field">
+          <label>Turno</label>
+          <select class="select" name="turno_id" id="editTurnoId" required>
+            <option value="">Seleccione…</option>
+            <?php foreach ($turnos as $t): ?>
+              <option value="<?php echo (int)$t["id"]; ?>"><?php echo e($t["nombre"]); ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+
+        <div class="field span2">
+          <label>Código de Barras</label>
+          <input class="input" name="codigo_barra" id="editCodigoBarra" required maxlength="50" inputmode="text">
+          <small style="display:block;color:#6b7280;margin-top:-6px;margin-bottom:12px">Hasta 50 caracteres, sin espacios.</small>
+        </div>
+
+        <div class="field span2">
+          <img class="edit-preview" id="editFotoPreview" alt="Foto actual" style="display:none">
+          <label>Foto (opcional)</label>
+          <input class="input" type="file" name="foto" id="editFoto" accept="image/jpeg,image/png,image/webp">
+        </div>
+
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn-light" id="btnCerrarModalEditar">Cancelar</button>
+        <button type="submit" class="btn-primary">Guardar Cambios</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script>
   // Validaciones del formulario de personal.
   (function(){
     const nombresInput = document.getElementById('inputNombres');
     const apellidosInput = document.getElementById('inputApellidos');
     const cedulaInput = document.getElementById('inputCedula');
+    const codigoBarraInput = document.getElementById('inputCodigoBarra');
+    const editNombres = document.getElementById('editNombres');
+    const editApellidos = document.getElementById('editApellidos');
+    const editCedula = document.getElementById('editCedula');
+    const editCodigoBarra = document.getElementById('editCodigoBarra');
     const regexNoLetras = /[^a-zA-ZáéíóúÁÉÍÓÚÜüÑñ\s]/g;
     const regexNoNumeros = /[^0-9]/g;
+    const regexCodigoLimpio = /[\s"']/g;
 
     // Nombres: solo letras
     if (nombresInput) {
@@ -592,6 +739,38 @@ require_once __DIR__ . "/../includes/header.php";
     if (cedulaInput) {
       cedulaInput.addEventListener('input', function() {
         this.value = this.value.replace(regexNoNumeros, '');
+      });
+    }
+
+    // Código de barras: quitar espacios y comillas, mayúsculas
+    if (codigoBarraInput) {
+      codigoBarraInput.addEventListener('input', function() {
+        this.value = this.value.replace(regexCodigoLimpio, '').toUpperCase();
+      });
+    }
+
+    // Limpieza equivalente para el modal de edición.
+    if (editNombres) {
+      editNombres.addEventListener('input', function() {
+        this.value = this.value.replace(regexNoLetras, '');
+      });
+    }
+
+    if (editApellidos) {
+      editApellidos.addEventListener('input', function() {
+        this.value = this.value.replace(regexNoLetras, '');
+      });
+    }
+
+    if (editCedula) {
+      editCedula.addEventListener('input', function() {
+        this.value = this.value.replace(regexNoNumeros, '');
+      });
+    }
+
+    if (editCodigoBarra) {
+      editCodigoBarra.addEventListener('input', function() {
+        this.value = this.value.replace(regexCodigoLimpio, '').toUpperCase();
       });
     }
   })();
@@ -657,6 +836,74 @@ require_once __DIR__ . "/../includes/header.php";
   } else {
     markPersonal();
   }
+})();
+</script>
+
+<script>
+(function(){
+  var modal = document.getElementById('modalEditarPersonal');
+  var cerrar = document.getElementById('btnCerrarModalEditar');
+
+  function cerrarModal(){
+    if (modal) modal.classList.remove('show');
+  }
+
+  function abrirModal(datos){
+    if (!modal) return;
+
+    var id = document.getElementById('editId');
+    var nombres = document.getElementById('editNombres');
+    var apellidos = document.getElementById('editApellidos');
+    var cedula = document.getElementById('editCedula');
+    var cargoId = document.getElementById('editCargoId');
+    var turnoId = document.getElementById('editTurnoId');
+    var codigo = document.getElementById('editCodigoBarra');
+    var foto = document.getElementById('editFoto');
+    var preview = document.getElementById('editFotoPreview');
+
+    if (id) id.value = datos.id || '';
+    if (nombres) nombres.value = datos.nombres || '';
+    if (apellidos) apellidos.value = datos.apellidos || '';
+    if (cedula) cedula.value = datos.cedula || '';
+    if (codigo) codigo.value = datos.codigo || '';
+
+    if (cargoId) cargoId.value = datos.cargoId || '';
+    if (turnoId) turnoId.value = datos.turnoId || '';
+
+    if (foto) foto.value = '';
+    if (preview) {
+      if (datos.foto) {
+        preview.src = '<?php echo BASE_URL; ?>/' + datos.foto;
+        preview.style.display = 'block';
+      } else {
+        preview.src = '';
+        preview.style.display = 'none';
+      }
+    }
+
+    modal.classList.add('show');
+  }
+
+  var botones = Array.prototype.slice.call(document.querySelectorAll('.btn-editar'));
+  botones.forEach(function(boton){
+    boton.addEventListener('click', function(){
+      abrirModal({
+        id: boton.getAttribute('data-id'),
+        nombres: boton.getAttribute('data-nombres'),
+        apellidos: boton.getAttribute('data-apellidos'),
+        cedula: boton.getAttribute('data-cedula'),
+        cargoId: boton.getAttribute('data-cargo-id'),
+        turnoId: boton.getAttribute('data-turno-id'),
+        codigo: boton.getAttribute('data-codigo'),
+        foto: boton.getAttribute('data-foto')
+      });
+    });
+  });
+
+  if (cerrar) cerrar.addEventListener('click', cerrarModal);
+  if (modal) modal.addEventListener('click', function(e){
+    if (e.target === modal) cerrarModal();
+  });
 })();
 </script>
 <?php require_once __DIR__ . "/../includes/footer.php"; ?>

@@ -42,8 +42,6 @@ if ($okAsistencia !== "" && $okEmpleadoId > 0) {
   $stmtOk->execute([$okEmpleadoId]);
   $okEmpleado = $stmtOk->fetch(PDO::FETCH_ASSOC) ?: null;
 }
-$modoEmergencia = !empty($_SESSION['modo_emergencia']);
-
 $q = trim($_GET["q"] ?? "");
 $estadoFiltro = trim($_GET["estado"] ?? "");
 $turnoFiltro  = trim($_GET["turno"] ?? "");
@@ -421,20 +419,6 @@ foreach ($rows as $row) {
   .in{background:#22c55e;color:#fff}
   .out{background:#ef4444;color:#fff}
   .muted{opacity:.75;font-size:12px;margin-top:6px}
-
-  .btn-emergency{background:#dc2626;color:#fff;border:none;padding:10px 14px;border-radius:12px;cursor:pointer;font-weight:900;font-size:13px}
-  .btn-emergency:hover{filter:brightness(1.1)}
-  .btn-emergency.active{background:#f59e0b;color:#111}
-  .emergency-bar{background:#fef3c7;border:2px solid #f59e0b;border-radius:12px;padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;font-weight:900;color:#92400e}
-  .emergency-bar .btn{margin-left:10px}
-  .modal-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:9999}
-  .modal-overlay.show{display:flex}
-  .modal-box{background:#fff;border-radius:16px;padding:24px;max-width:400px;width:90%;box-shadow:0 10px 40px rgba(0,0,0,.2)}
-  .modal-box h3{margin:0 0 12px;font-size:18px}
-  .modal-box .field{margin-bottom:12px}
-  .modal-box .field label{display:block;font-size:12px;font-weight:700;margin-bottom:4px}
-  .modal-box .field input{width:100%;padding:10px 12px;border:1px solid #d6dee8;border-radius:10px}
-  .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:16px}
 
   .pagination{display:flex;justify-content:space-between;align-items:center;margin-top:14px;padding-top:14px;border-top:1px solid #e5e7eb}
   .pagination-info{color:#6b7280;font-size:13px;font-weight:900}
@@ -860,21 +844,6 @@ tbody td:last-child{
 <?php endif; ?>
   <?php if ($err): ?><div class="alert bad"><?php echo e($err); ?></div><?php endif; ?>
 
-  <?php if ($modoEmergencia): ?>
-  <div class="emergency-bar">
-    <span>⚠️ MODO EMERGENCIA ACTIVO — Puedes registrar asistencia sin restricciones</span>
-    <form method="POST" action="../procesos/modo_emergencia.php" style="display:inline">
-    <?php echo csrfInput(); ?>
-      <input type="hidden" name="accion" value="desactivar">
-      <button class="btn btnL" type="submit">Desactivar</button>
-    </form>
-  </div>
-  <?php else: ?>
-  <div style="margin-bottom:14px;text-align:right">
-    <button class="btn-emergency" id="btnModoEmergencia">Modo Emergencia</button>
-  </div>
-  <?php endif; ?>
-
   <form class="filters-grid" method="GET">
     <input class="input" name="q" value="<?php echo e($q); ?>" placeholder="Buscar por nombre, cargo o cédula...">
 
@@ -1068,42 +1037,6 @@ if ($inicialFoto === "") {
   <?php endif; ?>
 </div>
 
-<div class="modal-overlay" id="modalEmergencia">
-  <div class="modal-box">
-    <h3>Modo Emergencia</h3>
-    <p style="font-size:13px;color:#6b7280;margin-bottom:14px">Ingresa credenciales de Directora o Subdirector para activar.</p>
-    <form method="POST" action="../procesos/modo_emergencia.php">
-    <?php echo csrfInput(); ?>
-      <input type="hidden" name="accion" value="activar">
-      <div class="field">
-        <label>Usuario</label>
-        <input type="text" name="usuario" required placeholder="Usuario administrador">
-      </div>
-      <div class="field">
-        <label>Contraseña</label>
-        <input type="password" name="clave" required placeholder="Contraseña">
-      </div>
-      <div class="modal-actions">
-        <button type="button" class="btn btnL" id="btnCerrarModal">Cancelar</button>
-        <button type="submit" class="btn btnP">Activar</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<script>
-
-(function(){
-  var btn = document.getElementById('btnModoEmergencia');
-  var modal = document.getElementById('modalEmergencia');
-  var cerrar = document.getElementById('btnCerrarModal');
-  if (btn && modal) {
-    btn.addEventListener('click', function(){ modal.classList.add('show'); });
-    if (cerrar) cerrar.addEventListener('click', function(){ modal.classList.remove('show'); });
-    modal.addEventListener('click', function(e){ if(e.target === modal) modal.classList.remove('show'); });
-  }
-})();
-</script>
 <script>
 (function(){
   var form = document.querySelector("form.filters, form.attendance-filters, form.attendance-filter-panel");
@@ -1147,24 +1080,6 @@ if ($inicialFoto === "") {
   var actions = document.createElement("div");
   actions.className = "attendance-filter-actions";
 
-  var emergencyButton = document.querySelector(".btn-emergency, button[name='modo_emergencia'], a[href*='modo_emergencia']");
-  var emergencyCarrier = null;
-
-  if (emergencyButton) {
-    emergencyButton.classList.add("attendance-emergency-action");
-
-    var emergencyForm = emergencyButton.closest("form");
-
-    if (emergencyForm && emergencyForm !== form && !form.contains(emergencyForm)) {
-      emergencyCarrier = emergencyForm;
-      emergencyCarrier.classList.add("attendance-emergency-wrapper");
-      actions.appendChild(emergencyCarrier);
-    } else {
-      emergencyCarrier = emergencyButton;
-      actions.appendChild(emergencyButton);
-    }
-  }
-
   head.appendChild(titleBox);
   head.appendChild(actions);
 
@@ -1173,11 +1088,6 @@ if ($inicialFoto === "") {
 
   originalChildren.forEach(function(node){
     if (node.nodeType === 3 && node.textContent.trim() === "") return;
-
-    if (emergencyCarrier) {
-      if (node === emergencyCarrier) return;
-      if (node.nodeType === 1 && node.contains(emergencyCarrier)) return;
-    }
 
     grid.appendChild(node);
   });

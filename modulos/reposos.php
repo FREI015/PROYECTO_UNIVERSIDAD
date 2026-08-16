@@ -71,6 +71,39 @@ if (!tieneAlcanceGlobalTurnos()) {
 
 $whereSql = trim($turnoWhereSql) !== "" ? (" WHERE 1 = 1 " . $turnoWhereSql) : "";
 
+// Filtros de consulta: empleado, estado y rango de fechas.
+$filtroEmpleadoId = (int)($_GET["empleado_id"] ?? 0);
+$filtroEstado = trim($_GET["estado"] ?? "");
+$filtroDesde = trim($_GET["desde"] ?? "");
+$filtroHasta = trim($_GET["hasta"] ?? "");
+
+$estadosPermitidos = [];
+$stmtEstados = $pdo->query("SELECT DISTINCT estado FROM reposos WHERE TRIM(estado) <> '' ORDER BY estado");
+$estadosPermitidos = $stmtEstados->fetchAll(PDO::FETCH_COLUMN);
+
+$paramsLista = $turnoParams;
+$whereLista = $whereSql !== "" ? $whereSql : " WHERE 1 = 1 ";
+
+if ($filtroEmpleadoId > 0) {
+  $whereLista .= " AND r.empleado_id = ? ";
+  $paramsLista[] = $filtroEmpleadoId;
+}
+
+if ($filtroEstado !== "" && in_array($filtroEstado, $estadosPermitidos, true)) {
+  $whereLista .= " AND r.estado = ? ";
+  $paramsLista[] = $filtroEstado;
+}
+
+if ($filtroDesde !== "" && preg_match('/^\d{4}-\d{2}-\d{2}$/', $filtroDesde)) {
+  $whereLista .= " AND r.fecha_fin >= ? ";
+  $paramsLista[] = $filtroDesde;
+}
+
+if ($filtroHasta !== "" && preg_match('/^\d{4}-\d{2}-\d{2}$/', $filtroHasta)) {
+  $whereLista .= " AND r.fecha_inicio <= ? ";
+  $paramsLista[] = $filtroHasta;
+}
+
 // empleados para el select
 $sqlEmpleados = "
   SELECT e.id, CONCAT(e.nombres,' ',e.apellidos) AS nombre, e.cedula, c.nombre AS cargo
@@ -90,10 +123,10 @@ $sqlTotal = "
   FROM reposos r
   JOIN empleados e ON e.id = r.empleado_id
   LEFT JOIN turnos t ON t.id = e.turno_id
-  $whereSql
+  $whereLista
 ";
 $stmtTotal = $pdo->prepare($sqlTotal);
-$stmtTotal->execute($turnoParams);
+$stmtTotal->execute($paramsLista);
 $totalReposos = (int)($stmtTotal->fetch(PDO::FETCH_ASSOC)["total"] ?? 0);
 $totalPaginas = (int)ceil($totalReposos / $porPagina);
 
@@ -109,12 +142,12 @@ $sqlReposos = "
   JOIN cargos c ON c.id = e.cargo_id
   LEFT JOIN turnos t ON t.id = e.turno_id
   LEFT JOIN usuarios u ON u.id = r.creado_por
-  $whereSql
+  $whereLista
   ORDER BY r.id DESC
   LIMIT $porPagina OFFSET $offset
 ";
 $stmtReposos = $pdo->prepare($sqlReposos);
-$stmtReposos->execute($turnoParams);
+$stmtReposos->execute($paramsLista);
 $reposos = $stmtReposos->fetchAll(PDO::FETCH_ASSOC);
 
 // Defensa secundaria: conserva filtro PHP por si cambia el SQL.
@@ -154,6 +187,26 @@ require_once __DIR__ . "/../includes/header.php";
   /* spans */
   .span2{ grid-column: span 2; }
   .spanAll{ grid-column: 1 / -1; }
+
+  .repo-filters-card{
+    margin-top:14px;
+    padding:14px;
+  }
+  .repo-filters-form{
+    display:grid;
+    grid-template-columns: 1.5fr 0.9fr 0.9fr 0.9fr auto;
+    gap:10px;
+    align-items:end;
+  }
+  .repo-filter-actions{
+    display:flex;
+    gap:8px;
+  }
+  .repo-filter-actions .btn,
+  .repo-filter-actions .btn-primary,
+  .repo-filter-actions .btn-light{
+    white-space:nowrap;
+  }
 
   /* labels: NO demasiado negrita */
   .field label{
@@ -203,12 +256,14 @@ require_once __DIR__ . "/../includes/header.php";
     .form-grid{ grid-template-columns: 1fr 1fr; }
     .span2{ grid-column: span 2; }
     .spanAll{ grid-column: span 2; }
+    .repo-filters-form{ grid-template-columns: 1fr 1fr; }
   }
   @media (max-width: 640px){
     .form-grid{ grid-template-columns: 1fr; }
     .span2, .spanAll{ grid-column: span 1; }
     .actions-row{ justify-content:stretch; }
     .actions-row .btn{ width:100%; }
+    .repo-filters-form{ grid-template-columns: 1fr; }
   }
 </style>
 
@@ -288,6 +343,49 @@ require_once __DIR__ . "/../includes/header.php";
     <div class="h1">Reposos Registrados</div>
     <p class="sub">Listado de reposos registrados.</p>
 
+    <div class="card repo-filters-card">
+      <form class="repo-filters-form" method="GET" action="reposos.php">
+        <div class="field">
+          <label>Empleado</label>
+          <select class="select" name="empleado_id">
+            <option value="">Todos</option>
+            <?php foreach ($empleados as $emp): ?>
+              <option value="<?php echo (int)$emp["id"]; ?>" <?php echo $filtroEmpleadoId === (int)$emp["id"] ? "selected" : ""; ?>>
+                <?php echo e($emp["nombre"]); ?> — <?php echo e(formatCedula($emp["cedula"])); ?> (<?php echo e($emp["cargo"]); ?>)
+              </option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+
+        <div class="field">
+          <label>Estado</label>
+          <select class="select" name="estado">
+            <option value="">Todos</option>
+            <?php foreach ($estadosPermitidos as $est): ?>
+              <option value="<?php echo e($est); ?>" <?php echo $filtroEstado === $est ? "selected" : ""; ?>>
+                <?php echo e($est); ?>
+              </option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+
+        <div class="field">
+          <label>Desde</label>
+          <input class="input" type="date" name="desde" value="<?php echo e($filtroDesde); ?>">
+        </div>
+
+        <div class="field">
+          <label>Hasta</label>
+          <input class="input" type="date" name="hasta" value="<?php echo e($filtroHasta); ?>">
+        </div>
+
+        <div class="repo-filter-actions">
+          <button class="btn btn-primary" type="submit">Filtrar</button>
+          <a class="btn btn-light" href="reposos.php" style="text-decoration:none;display:inline-flex;align-items:center;">Limpiar</a>
+        </div>
+      </form>
+    </div>
+
     <table class="reposos-table-modern">
       <thead>
         <tr>
@@ -329,7 +427,13 @@ require_once __DIR__ . "/../includes/header.php";
       <div class="pagination-pages">
         <?php
           function buildUrl($pag) {
-            return BASE_URL . "/modulos/reposos.php?pagina=" . $pag;
+            global $filtroEmpleadoId, $filtroEstado, $filtroDesde, $filtroHasta;
+            $params = ["pagina" => $pag];
+            if ($filtroEmpleadoId > 0) $params["empleado_id"] = $filtroEmpleadoId;
+            if ($filtroEstado !== "") $params["estado"] = $filtroEstado;
+            if ($filtroDesde !== "") $params["desde"] = $filtroDesde;
+            if ($filtroHasta !== "") $params["hasta"] = $filtroHasta;
+            return BASE_URL . "/modulos/reposos.php?" . http_build_query($params);
           }
         ?>
         <a href="<?php echo buildUrl($pagina - 1); ?>" class="<?php echo $pagina <= 1 ? 'disabled' : ''; ?>">‹ Anterior</a>

@@ -107,8 +107,6 @@ if (!$es_kiosko && !puedeVerTurno($emp["turno_nombre"] ?? "")) {
   barcode_err("No tienes permiso para marcar asistencia de este turno");
 }
 
-$modoEmergencia = !empty($_SESSION['modo_emergencia']);
-
 $tz = new DateTimeZone("America/Caracas");
 $now = new DateTimeImmutable("now", $tz);
 $hoy_real = $now->format("Y-m-d");
@@ -126,18 +124,16 @@ if ($horaFin !== null) {
   }
 }
 
-if (!$modoEmergencia) {
-  $stmt = $pdo->prepare("SELECT id FROM reposos WHERE empleado_id=? AND estado='ACTIVO' AND ? BETWEEN fecha_inicio AND fecha_fin LIMIT 1");
-  $stmt->execute([$empleado_id, $hoy_real]);
-  if ($stmt->fetch()) {
-    barcode_err("No puedes marcar: reposo activo");
-  }
+$stmt = $pdo->prepare("SELECT id FROM reposos WHERE empleado_id=? AND estado='ACTIVO' AND ? BETWEEN fecha_inicio AND fecha_fin LIMIT 1");
+$stmt->execute([$empleado_id, $hoy_real]);
+if ($stmt->fetch()) {
+  barcode_err("No puedes marcar: reposo activo");
+}
 
-  $stmt = $pdo->prepare("SELECT id FROM permisos WHERE empleado_id=? AND estado='ACTIVO' AND ? BETWEEN fecha_inicio AND fecha_fin LIMIT 1");
-  $stmt->execute([$empleado_id, $hoy_real]);
-  if ($stmt->fetch()) {
-    barcode_err("No puedes marcar: permiso activo");
-  }
+$stmt = $pdo->prepare("SELECT id FROM permisos WHERE empleado_id=? AND estado='ACTIVO' AND ? BETWEEN fecha_inicio AND fecha_fin LIMIT 1");
+$stmt->execute([$empleado_id, $hoy_real]);
+if ($stmt->fetch()) {
+  barcode_err("No puedes marcar: permiso activo");
 }
 
 $stmt = $pdo->prepare("SELECT id, hora_entrada, hora_salida, estado FROM asistencias WHERE empleado_id=? AND fecha=? LIMIT 1");

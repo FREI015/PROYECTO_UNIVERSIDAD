@@ -72,6 +72,39 @@ if (!tieneAlcanceGlobalTurnos()) {
 
 $whereSql = trim($turnoWhereSql) !== "" ? (" WHERE 1 = 1 " . $turnoWhereSql) : "";
 
+// Filtros de consulta: empleado, estado y rango de fechas.
+$filtroEmpleadoId = (int)($_GET["empleado_id"] ?? 0);
+$filtroEstado = trim($_GET["estado"] ?? "");
+$filtroDesde = trim($_GET["desde"] ?? "");
+$filtroHasta = trim($_GET["hasta"] ?? "");
+
+$estadosPermitidos = [];
+$stmtEstados = $pdo->query("SELECT DISTINCT estado FROM permisos WHERE TRIM(estado) <> '' ORDER BY estado");
+$estadosPermitidos = $stmtEstados->fetchAll(PDO::FETCH_COLUMN);
+
+$paramsLista = $turnoParams;
+$whereLista = $whereSql !== "" ? $whereSql : " WHERE 1 = 1 ";
+
+if ($filtroEmpleadoId > 0) {
+  $whereLista .= " AND p.empleado_id = ? ";
+  $paramsLista[] = $filtroEmpleadoId;
+}
+
+if ($filtroEstado !== "" && in_array($filtroEstado, $estadosPermitidos, true)) {
+  $whereLista .= " AND p.estado = ? ";
+  $paramsLista[] = $filtroEstado;
+}
+
+if ($filtroDesde !== "" && preg_match('/^\d{4}-\d{2}-\d{2}$/', $filtroDesde)) {
+  $whereLista .= " AND p.fecha_fin >= ? ";
+  $paramsLista[] = $filtroDesde;
+}
+
+if ($filtroHasta !== "" && preg_match('/^\d{4}-\d{2}-\d{2}$/', $filtroHasta)) {
+  $whereLista .= " AND p.fecha_inicio <= ? ";
+  $paramsLista[] = $filtroHasta;
+}
+
 // Empleados para el select
 $sqlEmpleados = "
   SELECT e.id, CONCAT(e.nombres,' ',e.apellidos) AS nombre, e.cedula, c.nombre AS cargo
@@ -91,10 +124,10 @@ $sqlTotal = "
   FROM permisos p
   JOIN empleados e ON e.id = p.empleado_id
   LEFT JOIN turnos t ON t.id = e.turno_id
-  $whereSql
+  $whereLista
 ";
 $stmtTotal = $pdo->prepare($sqlTotal);
-$stmtTotal->execute($turnoParams);
+$stmtTotal->execute($paramsLista);
 $totalPermisos = (int)($stmtTotal->fetch(PDO::FETCH_ASSOC)["total"] ?? 0);
 $totalPaginas = (int)ceil($totalPermisos / $porPagina);
 
@@ -110,12 +143,12 @@ $sqlPermisos = "
   JOIN cargos c ON c.id = e.cargo_id
   LEFT JOIN turnos t ON t.id = e.turno_id
   LEFT JOIN usuarios u ON u.id = p.creado_por
-  $whereSql
+  $whereLista
   ORDER BY p.id DESC
   LIMIT $porPagina OFFSET $offset
 ";
 $stmtPermisos = $pdo->prepare($sqlPermisos);
-$stmtPermisos->execute($turnoParams);
+$stmtPermisos->execute($paramsLista);
 $permisos = $stmtPermisos->fetchAll(PDO::FETCH_ASSOC);
 
 // Defensa secundaria: conserva filtro PHP por si cambia el SQL.
@@ -249,6 +282,25 @@ require_once __DIR__ . "/../includes/header.php";
     margin-top:14px;
     padding: 18px;
   }
+
+  .perm-filters-card{
+    margin-top:14px;
+    padding:14px;
+  }
+  .perm-filters-form{
+    display:grid;
+    grid-template-columns: 1.5fr 0.9fr 0.9fr 0.9fr auto;
+    gap:10px;
+    align-items:end;
+  }
+  .perm-filter-actions{
+    display:flex;
+    gap:8px;
+  }
+  .perm-filter-actions .btn-primary,
+  .perm-filter-actions .btn-light{
+    white-space:nowrap;
+  }
   .table-title{
     font-size: 18px;
     font-weight: 850;
@@ -270,6 +322,7 @@ require_once __DIR__ . "/../includes/header.php";
     .grid{ grid-template-columns: 1fr 1fr; }
     .span2{ grid-column: span 2; }
     .spanAll{ grid-column: span 2; }
+    .perm-filters-form{ grid-template-columns: 1fr 1fr; }
   }
   @media (max-width: 640px){
     .grid{ grid-template-columns: 1fr; }
@@ -277,6 +330,7 @@ require_once __DIR__ . "/../includes/header.php";
     .actions-row{ justify-content:stretch; }
     .actions-row .btn-primary,
     .actions-row .btn-light{ width:100%; }
+    .perm-filters-form{ grid-template-columns: 1fr; }
   }
 </style>
 
@@ -351,7 +405,50 @@ require_once __DIR__ . "/../includes/header.php";
 
   <div class="card table-card">
     <div class="table-title">Permisos Registrados</div>
-    <p class="table-sub">Últimos 50 registros.</p>
+    <p class="table-sub">Listado de permisos registrados.</p>
+
+    <div class="card perm-filters-card">
+      <form class="perm-filters-form" method="GET" action="permisos.php">
+        <div class="field">
+          <label>Empleado</label>
+          <select class="select" name="empleado_id">
+            <option value="">Todos</option>
+            <?php foreach ($empleados as $emp): ?>
+              <option value="<?php echo (int)$emp["id"]; ?>" <?php echo $filtroEmpleadoId === (int)$emp["id"] ? "selected" : ""; ?>>
+                <?php echo e($emp["nombre"]); ?> — <?php echo e(formatCedula($emp["cedula"])); ?> (<?php echo e($emp["cargo"]); ?>)
+              </option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+
+        <div class="field">
+          <label>Estado</label>
+          <select class="select" name="estado">
+            <option value="">Todos</option>
+            <?php foreach ($estadosPermitidos as $est): ?>
+              <option value="<?php echo e($est); ?>" <?php echo $filtroEstado === $est ? "selected" : ""; ?>>
+                <?php echo e($est); ?>
+              </option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+
+        <div class="field">
+          <label>Desde</label>
+          <input class="input" type="date" name="desde" value="<?php echo e($filtroDesde); ?>">
+        </div>
+
+        <div class="field">
+          <label>Hasta</label>
+          <input class="input" type="date" name="hasta" value="<?php echo e($filtroHasta); ?>">
+        </div>
+
+        <div class="perm-filter-actions">
+          <button class="btn-primary" type="submit">Filtrar</button>
+          <a class="btn-light" href="permisos.php">Limpiar</a>
+        </div>
+      </form>
+    </div>
 
     <table class="permissions-table-modern">
       <thead>
@@ -394,7 +491,13 @@ require_once __DIR__ . "/../includes/header.php";
       <div class="pagination-pages">
         <?php
           function buildUrl($pag) {
-            return BASE_URL . "/modulos/permisos.php?pagina=" . $pag;
+            global $filtroEmpleadoId, $filtroEstado, $filtroDesde, $filtroHasta;
+            $params = ["pagina" => $pag];
+            if ($filtroEmpleadoId > 0) $params["empleado_id"] = $filtroEmpleadoId;
+            if ($filtroEstado !== "") $params["estado"] = $filtroEstado;
+            if ($filtroDesde !== "") $params["desde"] = $filtroDesde;
+            if ($filtroHasta !== "") $params["hasta"] = $filtroHasta;
+            return BASE_URL . "/modulos/permisos.php?" . http_build_query($params);
           }
         ?>
         <a href="<?php echo buildUrl($pagina - 1); ?>" class="<?php echo $pagina <= 1 ? 'disabled' : ''; ?>">‹ Anterior</a>

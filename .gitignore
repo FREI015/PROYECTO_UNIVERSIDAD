@@ -67,6 +67,8 @@ backups/
 _auditoria_senior/
 # Conexion local con credenciales reales
 includes/conexion.php
+# Credenciales temporales en texto plano
+credenciales.txt
 # Respaldos locales
 # Mantener ejemplo de conexion versionable
 !conexion.example.php
