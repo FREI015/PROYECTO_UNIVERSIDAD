@@ -1,0 +1,37 @@
+﻿
+==============================================
+CIERRE FINAL PROYECTO UNIVERSIDAD
+==============================================
+
+
+Fecha:
+
+08/24/2026 16:45:31
+
+
+Cambios realizados:
+
+
+[X] MER actualizado
+
+[X] Diagrama clases actualizado
+
+[X] Codigo de barras documentado
+
+[X] Relacion empleados/asistencias validada
+
+[X] Documentacion subida a GitHub
+
+
+Commit:
+
+Actualizar MER y diagrama de clases con lector de codigo de barras
+
+
+Estado:
+
+Proceso completado
+
+
+==============================================
+
