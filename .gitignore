@@ -93,3 +93,15 @@ docs/LIMPIEZA_FINAL_*/
 *.temp
 *.log
 
+
+# Limpieza profesional
+_auditoria_senior/
+docs/AUDITORIA_LIMPIEZA/
+docs/LIMPIEZA_FINAL_*/
+*.backup
+*.bak
+*.old
+*.tmp
+*.temp
+*.log
+
