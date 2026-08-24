@@ -81,3 +81,15 @@ sql/control_asistencia_completa.sql
 
 # Herramientas locales de prueba
 pruebas_generacion.php
+
+# Limpieza profesional
+_auditoria_senior/
+docs/AUDITORIA_LIMPIEZA/
+docs/LIMPIEZA_FINAL_*/
+*.backup
+*.bak
+*.old
+*.tmp
+*.temp
+*.log
+
