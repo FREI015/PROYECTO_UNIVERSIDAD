@@ -131,3 +131,22 @@ No deben versionarse:
 - backups locales.
 
 El detalle por archivo de cada cambio esta en CAMBIOS.md.
+
+
+
+
+## Actualización lector de código de barras
+
+Fecha:
+2026-08-24
+
+
+Cambios documentados:
+
+- Actualización MER.
+- Actualización diagrama de clases.
+- Integración atributo codigo_barra.
+- Relación empleados/asistencias.
+- Flujo de registro mediante lector barcode.
+
+

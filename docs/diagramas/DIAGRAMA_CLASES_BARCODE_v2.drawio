@@ -1,0 +1,79 @@
+﻿<mxfile host="app.diagrams.net">
+<diagram name="Clases Barcode">
+<mxGraphModel>
+<root>
+
+<mxCell id="0"/>
+<mxCell id="1" parent="0"/>
+
+
+<mxCell id="lector"
+value="LectorBarcode&#xa;&#xa;+leerCodigo()&#xa;+validarCodigo()"
+style="rounded=1;whiteSpace=wrap;"
+vertex="1"
+parent="1">
+<mxGeometry x="100" y="100" width="200" height="120" as="geometry"/>
+</mxCell>
+
+
+<mxCell id="control"
+value="ControlAsistencia&#xa;&#xa;+buscarEmpleado()&#xa;+registrarEntrada()&#xa;+registrarSalida()"
+style="rounded=1;whiteSpace=wrap;"
+vertex="1"
+parent="1">
+<mxGeometry x="400" y="100" width="240" height="150" as="geometry"/>
+</mxCell>
+
+
+<mxCell id="empleado"
+value="Empleado&#xa;&#xa;id&#xa;nombres&#xa;apellidos&#xa;cedula&#xa;codigoBarra"
+style="rounded=1;whiteSpace=wrap;"
+vertex="1"
+parent="1">
+<mxGeometry x="400" y="350" width="220" height="150" as="geometry"/>
+</mxCell>
+
+
+<mxCell id="asistencia"
+value="Asistencia&#xa;&#xa;id&#xa;fecha&#xa;entrada&#xa;salida&#xa;estado"
+style="rounded=1;whiteSpace=wrap;"
+vertex="1"
+parent="1">
+<mxGeometry x="700" y="350" width="220" height="150" as="geometry"/>
+</mxCell>
+
+
+<mxCell id="r1"
+value=""
+edge="1"
+source="lector"
+target="control"
+parent="1">
+<mxGeometry relative="1" as="geometry"/>
+</mxCell>
+
+
+<mxCell id="r2"
+value=""
+edge="1"
+source="control"
+target="empleado"
+parent="1">
+<mxGeometry relative="1" as="geometry"/>
+</mxCell>
+
+
+<mxCell id="r3"
+value="1:N"
+edge="1"
+source="empleado"
+target="asistencia"
+parent="1">
+<mxGeometry relative="1" as="geometry"/>
+</mxCell>
+
+
+</root>
+</mxGraphModel>
+</diagram>
+</mxfile>

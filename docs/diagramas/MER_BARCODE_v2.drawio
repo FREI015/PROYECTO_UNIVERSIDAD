@@ -1,0 +1,42 @@
+﻿<mxfile host="app.diagrams.net">
+<diagram name="MER Barcode">
+<mxGraphModel>
+<root>
+
+<mxCell id="0"/>
+<mxCell id="1" parent="0"/>
+
+
+<mxCell id="empleados"
+value="EMPLEADOS&#xa;&#xa;PK id&#xa;cedula&#xa;nombres&#xa;apellidos&#xa;telefono&#xa;codigo_barra VARCHAR(50) UNIQUE&#xa;cargo_id FK&#xa;turno_id FK"
+style="rounded=1;whiteSpace=wrap;"
+vertex="1"
+parent="1">
+<mxGeometry x="100" y="100" width="240" height="220" as="geometry"/>
+</mxCell>
+
+
+<mxCell id="asistencias"
+value="ASISTENCIAS&#xa;&#xa;PK id&#xa;empleado_id FK&#xa;fecha&#xa;entrada&#xa;salida&#xa;estado&#xa;registrado_por"
+style="rounded=1;whiteSpace=wrap;"
+vertex="1"
+parent="1">
+<mxGeometry x="500" y="100" width="240" height="220" as="geometry"/>
+</mxCell>
+
+
+<mxCell id="relacion"
+value="1:N"
+style="edgeStyle=orthogonalEdgeStyle;"
+edge="1"
+source="empleados"
+target="asistencias"
+parent="1">
+<mxGeometry relative="1" as="geometry"/>
+</mxCell>
+
+
+</root>
+</mxGraphModel>
+</diagram>
+</mxfile>

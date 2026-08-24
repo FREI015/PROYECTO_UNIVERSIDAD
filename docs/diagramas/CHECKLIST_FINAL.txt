@@ -1,0 +1,22 @@
+﻿
+CHECKLIST FINAL
+
+[X] Codigo actualizado desde GitHub
+
+[X] Campo codigo_barra documentado
+
+[X] Tipo VARCHAR(50)
+
+[X] Restricción UNIQUE
+
+[X] MER creado
+
+[X] Diagrama clases creado
+
+[X] Flujo barcode documentado
+
+[ ] Validación profesora
+
+[ ] Commit final
+
+
