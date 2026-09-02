@@ -1,4 +1,4 @@
-.DS_Store
+﻿.DS_Store
 Thumbs.db
 desktop.ini
 
@@ -66,7 +66,6 @@ backups/
 # Auditorias locales generadas durante revision senior
 _auditoria_senior/
 # Conexion local con credenciales reales
-includes/conexion.php
 # Credenciales temporales en texto plano
 credenciales.txt
 # Respaldos locales
