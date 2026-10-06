@@ -6,6 +6,11 @@ function e($value) {
   return htmlspecialchars((string)$value, ENT_QUOTES, "UTF-8");
 }
 
+// Presentacion de nombres y apellidos en MAYUSCULAS (solo visual).
+function nombreMayusculas($value): string {
+  return mb_strtoupper(trim((string)$value), "UTF-8");
+}
+
 function noCache() {
   header("Cache-Control: no-store, no-cache, must-revalidate");
   header("Cache-Control: post-check=0, pre-check=0", false);

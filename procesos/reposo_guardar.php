@@ -46,6 +46,24 @@ if ($fecha_fin < $fecha_inicio) {
   exit;
 }
 
+// Bloquea en el servidor fechas anteriores a hoy (nuevos registros).
+if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fecha_inicio) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $fecha_fin)) {
+  header("Location: " . BASE_URL . "/modulos/reposos.php?err=" . urlencode("Formato de fecha inválido"));
+  exit;
+}
+
+$hoy = date("Y-m-d");
+
+if ($fecha_inicio < $hoy) {
+  header("Location: " . BASE_URL . "/modulos/reposos.php?err=" . urlencode("La fecha de inicio no puede ser anterior a hoy"));
+  exit;
+}
+
+if ($fecha_fin < $hoy) {
+  header("Location: " . BASE_URL . "/modulos/reposos.php?err=" . urlencode("La fecha final no puede ser anterior a hoy"));
+  exit;
+}
+
 // Valida que el empleado esté activo.
 $st = $pdo->prepare("SELECT estado FROM empleados WHERE id=? LIMIT 1");
 $st->execute([$empleado_id]);

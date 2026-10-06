@@ -289,7 +289,7 @@ require_once __DIR__ . "/../includes/header.php";
                 <option value="">Selecciona un empleado...</option>
                 <?php foreach($empleados as $e): ?>
                   <option value="<?php echo (int)$e["id"]; ?>">
-                    <?php echo e($e["nombre"]); ?> — <?php echo e(formatCedula($e["cedula"])); ?> (<?php echo e($e["cargo"]); ?>)
+                    <?php echo e(nombreMayusculas($e["nombre"])); ?> — <?php echo e(formatCedula($e["cedula"])); ?> (<?php echo e($e["cargo"]); ?>)
                   </option>
                 <?php endforeach; ?>
               </select>
@@ -302,12 +302,12 @@ require_once __DIR__ . "/../includes/header.php";
 
             <div class="field">
               <label>Desde</label>
-              <input class="input" type="date" name="fecha_inicio" id="fecha_inicio" required>
+              <input class="input" type="date" name="fecha_inicio" id="fecha_inicio" min="<?php echo date('Y-m-d'); ?>" required>
             </div>
 
             <div class="field">
               <label>Hasta</label>
-              <input class="input" type="date" name="fecha_fin" id="fecha_fin" required>
+              <input class="input" type="date" name="fecha_fin" id="fecha_fin" min="<?php echo date('Y-m-d'); ?>" required>
             </div>
 
             <div class="field span2">
@@ -351,7 +351,7 @@ require_once __DIR__ . "/../includes/header.php";
             <option value="">Todos</option>
             <?php foreach ($empleados as $emp): ?>
               <option value="<?php echo (int)$emp["id"]; ?>" <?php echo $filtroEmpleadoId === (int)$emp["id"] ? "selected" : ""; ?>>
-                <?php echo e($emp["nombre"]); ?> — <?php echo e(formatCedula($emp["cedula"])); ?> (<?php echo e($emp["cargo"]); ?>)
+                <?php echo e(nombreMayusculas($emp["nombre"])); ?> — <?php echo e(formatCedula($emp["cedula"])); ?> (<?php echo e($emp["cargo"]); ?>)
               </option>
             <?php endforeach; ?>
           </select>
@@ -406,7 +406,7 @@ require_once __DIR__ . "/../includes/header.php";
 
         <?php foreach($reposos as $r): ?>
           <tr>
-            <td><?php echo e($r["empleado"]); ?></td>
+            <td><?php echo e(nombreMayusculas($r["empleado"])); ?></td>
             <td><?php echo e(formatCedula($r["cedula"])); ?></td>
             <td><?php echo e($r["cargo"]); ?></td>
             <td><?php echo e($r["tipo"]); ?></td>
@@ -449,20 +449,42 @@ require_once __DIR__ . "/../includes/header.php";
 </div>
 
 <script>
-  // Valida que la fecha final no sea menor que la inicial.
+  // Bloquea fechas anteriores a hoy y valida que la final no sea menor que la inicial.
   (function(){
     const desde = document.getElementById('fecha_inicio');
     const hasta = document.getElementById('fecha_fin');
 
+    function hoyISO(){
+      const d = new Date();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const dia = String(d.getDate()).padStart(2, '0');
+      return d.getFullYear() + '-' + m + '-' + dia;
+    }
+
+    const hoy = hoyISO();
+
+    function maxHoy(valor){
+      return (!valor || valor < hoy) ? hoy : valor;
+    }
+
     function syncMin(){
       if (!desde || !hasta) return;
+
+      desde.min = hoy;
+      hasta.min = maxHoy(desde.value || hoy);
+
+      if (desde.value && desde.value < hoy) {
+        desde.value = hoy;
+      }
+
       if (desde.value) {
-        hasta.min = desde.value;
         if (hasta.value && hasta.value < desde.value) {
           hasta.value = desde.value;
         }
-      } else {
-        hasta.min = "";
+      }
+
+      if (hasta.value && hasta.value < hoy) {
+        hasta.value = hoy;
       }
     }
 
