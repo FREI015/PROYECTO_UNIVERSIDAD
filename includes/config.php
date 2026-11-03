@@ -76,3 +76,71 @@ if (!defined("RETARDO_TOLERANCIA_MINUTOS")) {
 if (!defined("ASISTENCIA_MARGEN_ANTES_MINUTOS")) {
   define("ASISTENCIA_MARGEN_ANTES_MINUTOS", 5);
 }
+
+/**
+ * Ventanas horarias del primer turno.
+ *
+ * La ventana determina si se permite marcar. El calculo de
+ * retardos de la entrada se conserva con RETARDO_TOLERANCIA_MINUTOS.
+ */
+if (!defined("PRIMER_TURNO_ID")) {
+  define("PRIMER_TURNO_ID", 1);
+}
+
+if (!defined("PRIMER_TURNO_NOMBRE")) {
+  define("PRIMER_TURNO_NOMBRE", "MATUTINO");
+}
+
+if (!defined("PRIMER_TURNO_ENTRADA_DESDE")) {
+  define("PRIMER_TURNO_ENTRADA_DESDE", "06:55:00");
+}
+
+if (!defined("PRIMER_TURNO_ENTRADA_PUNTUAL_HASTA")) {
+  define("PRIMER_TURNO_ENTRADA_PUNTUAL_HASTA", "07:05:00");
+}
+
+if (!defined("PRIMER_TURNO_ENTRADA_HASTA")) {
+  define("PRIMER_TURNO_ENTRADA_HASTA", "08:00:00");
+}
+
+if (!defined("PRIMER_TURNO_SALIDA_DESDE")) {
+  define("PRIMER_TURNO_SALIDA_DESDE", "15:00:00");
+}
+
+if (!defined("PRIMER_TURNO_SALIDA_HASTA")) {
+  define("PRIMER_TURNO_SALIDA_HASTA", "16:00:00");
+}
+
+/**
+ * Ventanas horarias del segundo turno.
+ *
+ * La hora de inicio del turno (12:00 PM) se conserva en la tabla
+ * turnos para mantener el calculo actual de retardos.
+ */
+if (!defined("SEGUNDO_TURNO_ID")) {
+  define("SEGUNDO_TURNO_ID", 2);
+}
+
+if (!defined("SEGUNDO_TURNO_NOMBRE")) {
+  define("SEGUNDO_TURNO_NOMBRE", "VESPERTINO");
+}
+
+if (!defined("SEGUNDO_TURNO_ENTRADA_DESDE")) {
+  define("SEGUNDO_TURNO_ENTRADA_DESDE", "11:55:00");
+}
+
+if (!defined("SEGUNDO_TURNO_ENTRADA_PUNTUAL_HASTA")) {
+  define("SEGUNDO_TURNO_ENTRADA_PUNTUAL_HASTA", "12:05:00");
+}
+
+if (!defined("SEGUNDO_TURNO_ENTRADA_HASTA")) {
+  define("SEGUNDO_TURNO_ENTRADA_HASTA", "13:00:00");
+}
+
+if (!defined("SEGUNDO_TURNO_SALIDA_DESDE")) {
+  define("SEGUNDO_TURNO_SALIDA_DESDE", "17:00:00");
+}
+
+if (!defined("SEGUNDO_TURNO_SALIDA_HASTA")) {
+  define("SEGUNDO_TURNO_SALIDA_HASTA", "18:00:00");
+}

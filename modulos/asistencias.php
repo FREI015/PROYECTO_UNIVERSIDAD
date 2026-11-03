@@ -220,6 +220,7 @@ SELECT
     e.foto_archivo,
   c.nombre AS cargo,
   e.estado AS estado_empleado,
+  t.id AS turno_id,
   t.nombre AS turno_nombre,
   a.es_retardo,
   a.es_asistio,
@@ -419,6 +420,11 @@ foreach ($rows as $row) {
   .in{background:#22c55e;color:#fff}
   .out{background:#ef4444;color:#fff}
   .muted{opacity:.75;font-size:12px;margin-top:6px}
+
+  .admin-exception{margin-top:6px;font-size:11px;color:#475569}
+  .admin-exception summary{cursor:pointer;font-weight:900;color:#64748b}
+  .admin-exception label{display:flex;align-items:center;gap:6px;font-weight:800;margin-top:6px;cursor:pointer}
+  .admin-exception input[type="text"]{margin-top:6px;padding:6px 8px;border:1px solid #d6dee8;border-radius:8px;font-size:11px;width:100%;max-width:180px}
 
   .pagination{display:flex;justify-content:space-between;align-items:center;margin-top:14px;padding-top:14px;border-top:1px solid #e5e7eb}
   .pagination-info{color:#6b7280;font-size:13px;font-weight:900}
@@ -956,6 +962,12 @@ tbody td:last-child{
 
           $nombre = titleCaseEs($e["nombre"]);
           $turnoNombre = $e["turno_nombre"] ?: "—";
+          $tipoTurnoFila = tipoTurnoVentanas(
+            (string)($e["turno_nombre"] ?? ""),
+            (int)($e["turno_id"] ?? 0)
+          );
+
+          $tieneVentanaFila = $tipoTurnoFila !== null;
 $fotoArchivo = trim((string)($e["foto_archivo"] ?? ""));
 $fotoUrl = fotoEmpleadoUrl($fotoArchivo);
 $inicialFoto = strtoupper(substr(trim((string)$nombre), 0, 1));
@@ -989,6 +1001,13 @@ if ($inicialFoto === "") {
                 <input type="hidden" name="empleado_id" value="<?php echo (int)$e["id"]; ?>">
                 <input type="hidden" name="return_query" value="<?php echo e($returnQuery); ?>">
                 <button class="mini in" type="submit" <?php echo $bloquear ? "disabled" : ""; ?>>Entrada</button>
+                <?php if ($tieneAlcanceGlobal && $tieneVentanaFila): ?>
+                  <details class="admin-exception">
+                    <summary>Excepción administrativa</summary>
+                    <label><input type="checkbox" name="excepcion_admin" value="1"> Autorizar fuera de horario</label>
+                    <input type="text" name="motivo_excepcion" maxlength="120" placeholder="Motivo de la excepción">
+                  </details>
+                <?php endif; ?>
               </form>
 
               <form method="POST" action="../procesos/asistencia_salida.php">
@@ -996,6 +1015,13 @@ if ($inicialFoto === "") {
                 <input type="hidden" name="empleado_id" value="<?php echo (int)$e["id"]; ?>">
                 <input type="hidden" name="return_query" value="<?php echo e($returnQuery); ?>">
                 <button class="mini out" type="submit" <?php echo $bloquear ? "disabled" : ""; ?>>Salida</button>
+                <?php if ($tieneAlcanceGlobal && $tieneVentanaFila): ?>
+                  <details class="admin-exception">
+                    <summary>Excepción administrativa</summary>
+                    <label><input type="checkbox" name="excepcion_admin" value="1"> Autorizar fuera de horario</label>
+                    <input type="text" name="motivo_excepcion" maxlength="120" placeholder="Motivo de la excepción">
+                  </details>
+                <?php endif; ?>
               </form>
             </div>
             <?php if ($bloquear && $bloqueoTxt): ?><div class="muted"><?php echo e($bloqueoTxt); ?></div><?php endif; ?>

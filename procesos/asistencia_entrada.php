@@ -88,6 +88,35 @@ if (!puedeVerTurno($emp["turno_nombre"] ?? "")) {
     header("Location: " . asistenciaReturnUrl("err", "No tienes permiso para marcar asistencia de este turno"));
     exit;
 }
+
+$tipoTurno = tipoTurnoVentanas(
+  (string)($emp["turno_nombre"] ?? ""),
+  (int)($emp["turno_id"] ?? 0)
+);
+
+$tieneVentanaTurno = $tipoTurno !== null;
+
+$esExcepcionAdmin = false;
+$motivoExcepcion = trim((string)($_POST["motivo_excepcion"] ?? ""));
+
+if ($tieneVentanaTurno && (string)($_POST["excepcion_admin"] ?? "") === "1") {
+  if (!esRolGlobal()) {
+    header("Location: " . asistenciaReturnUrl("err", "No tienes permiso para registrar excepciones administrativas"));
+    exit;
+  }
+
+  if ($motivoExcepcion === "") {
+    header("Location: " . asistenciaReturnUrl("err", "Debe indicar el motivo de la excepción administrativa"));
+    exit;
+  }
+
+  if (strlen($motivoExcepcion) > 120) {
+    $motivoExcepcion = substr($motivoExcepcion, 0, 120);
+  }
+
+  $esExcepcionAdmin = true;
+}
+
 // Bloquear si tiene reposo/permiso activo HOY (fecha real).
 $stmt = $pdo->prepare("SELECT id FROM reposos WHERE empleado_id=? AND estado='ACTIVO' AND ? BETWEEN fecha_inicio AND fecha_fin LIMIT 1");
 $stmt->execute([$empleado_id, $hoy_real]);
@@ -126,6 +155,20 @@ if ($horaFin !== null) {
   }
 }
 
+if ($tieneVentanaTurno && !$esExcepcionAdmin) {
+  $ventanaEntrada = validarVentanaEntradaTurno(
+    $fecha_asistencia,
+    $now,
+    $tz,
+    (string)$tipoTurno
+  );
+
+  if (!$ventanaEntrada["ok"]) {
+    header("Location: " . asistenciaReturnUrl("err", (string)$ventanaEntrada["error"]));
+    exit;
+  }
+}
+
 /**
  * Usa tolerancia configurada cuando esté disponible.
 */
@@ -145,7 +188,7 @@ if (defined("ASISTENCIA_MARGEN_ANTES_MINUTOS")) {
 
 $inicioPermitido = $inicioTurno->modify("-" . $margenAntesMin . " minutes");
 
-if ($now->getTimestamp() < $inicioPermitido->getTimestamp()) {
+if (!$tieneVentanaTurno && !$esExcepcionAdmin && $now->getTimestamp() < $inicioPermitido->getTimestamp()) {
     header("Location: " . asistenciaReturnUrl("err", "Aun no esta dentro del margen permitido para marcar entrada"));
     exit;
 }
@@ -166,22 +209,53 @@ $stmt->execute([$empleado_id, $fecha_asistencia]);
 $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if ($row && !empty($row["hora_entrada"])) {
-  header("Location: " . asistenciaReturnUrl("err", "Ya tiene entrada registrada para esa fecha"));
+  $mensajeDuplicado = $tieneVentanaTurno
+    ? "Ya existe un registro de entrada para esta jornada."
+    : "Ya tiene entrada registrada para esa fecha";
+  header("Location: " . asistenciaReturnUrl("err", $mensajeDuplicado));
   exit;
 }
 
-if ($row) {
-  $upd = $pdo->prepare("UPDATE asistencias SET hora_entrada=?, estado=?, minutos_tarde=?, registrado_por=? WHERE id=?");
-  $upd->execute([$hora_now, $estado, $min_tarde, $registrado_por, (int)$row["id"]]);
-} else {
-  $ins = $pdo->prepare("
-    INSERT INTO asistencias (empleado_id, fecha, estado, hora_entrada, minutos_tarde, registrado_por)
-    VALUES (?, ?, ?, ?, ?, ?)
-  ");
-  $ins->execute([$empleado_id, $fecha_asistencia, $estado, $hora_now, $min_tarde, $registrado_por]);
+$observacionSistema = null;
+if ($esExcepcionAdmin) {
+  $observacionSistema = "Excepción administrativa justificada: " . $motivoExcepcion;
 }
 
-header("Location: " . asistenciaReturnUrl("msg", "Asistencia guardada con éxito", [
+if ($row) {
+  if ($esExcepcionAdmin) {
+    $upd = $pdo->prepare("UPDATE asistencias SET hora_entrada=?, estado=?, minutos_tarde=?, registrado_por=?, observacion_sistema=? WHERE id=?");
+    $upd->execute([$hora_now, $estado, $min_tarde, $registrado_por, $observacionSistema, (int)$row["id"]]);
+  } else {
+    $upd = $pdo->prepare("UPDATE asistencias SET hora_entrada=?, estado=?, minutos_tarde=?, registrado_por=? WHERE id=?");
+    $upd->execute([$hora_now, $estado, $min_tarde, $registrado_por, (int)$row["id"]]);
+  }
+} else {
+  if ($esExcepcionAdmin) {
+    $ins = $pdo->prepare("
+      INSERT INTO asistencias (empleado_id, fecha, estado, hora_entrada, minutos_tarde, registrado_por, observacion_sistema)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    ");
+    $ins->execute([$empleado_id, $fecha_asistencia, $estado, $hora_now, $min_tarde, $registrado_por, $observacionSistema]);
+  } else {
+    $ins = $pdo->prepare("
+      INSERT INTO asistencias (empleado_id, fecha, estado, hora_entrada, minutos_tarde, registrado_por)
+      VALUES (?, ?, ?, ?, ?, ?)
+    ");
+    $ins->execute([$empleado_id, $fecha_asistencia, $estado, $hora_now, $min_tarde, $registrado_por]);
+  }
+}
+
+$mensaje = "Asistencia guardada con éxito";
+
+if ($esExcepcionAdmin) {
+  $mensaje = "Asistencia registrada como excepción administrativa.";
+} elseif ($tieneVentanaTurno) {
+  $mensaje = $estado === "RETARDO"
+    ? "Asistencia registrada correctamente. Entrada con retardo."
+    : "Asistencia registrada correctamente. Entrada puntual.";
+}
+
+header("Location: " . asistenciaReturnUrl("msg", $mensaje, [
   "ok_asistencia" => "entrada",
   "empleado_id" => $empleado_id,
   "ok_estado" => $estado,

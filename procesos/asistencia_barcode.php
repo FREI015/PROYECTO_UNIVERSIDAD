@@ -107,6 +107,13 @@ if (!$es_kiosko && !puedeVerTurno($emp["turno_nombre"] ?? "")) {
   barcode_err("No tienes permiso para marcar asistencia de este turno");
 }
 
+$tipoTurno = tipoTurnoVentanas(
+  (string)($emp["turno_nombre"] ?? ""),
+  (int)($emp["turno_id"] ?? 0)
+);
+
+$tieneVentanaTurno = $tipoTurno !== null;
+
 $tz = new DateTimeZone("America/Caracas");
 $now = new DateTimeImmutable("now", $tz);
 $hoy_real = $now->format("Y-m-d");
@@ -136,7 +143,7 @@ if ($stmt->fetch()) {
   barcode_err("No puedes marcar: permiso activo");
 }
 
-$stmt = $pdo->prepare("SELECT id, hora_entrada, hora_salida, estado FROM asistencias WHERE empleado_id=? AND fecha=? LIMIT 1");
+$stmt = $pdo->prepare("SELECT id, hora_entrada, hora_salida, estado, observacion_sistema FROM asistencias WHERE empleado_id=? AND fecha=? LIMIT 1");
 $stmt->execute([$empleado_id, $fecha_asistencia]);
 $asistencia = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -144,6 +151,19 @@ $uid = (int)($_SESSION["user"]["id"] ?? ($_SESSION["usuario_id"] ?? 0));
 $registrado_por = $uid > 0 ? $uid : null;
 
 if (!$asistencia || empty($asistencia["hora_entrada"])) {
+  if ($tieneVentanaTurno) {
+    $ventanaEntrada = validarVentanaEntradaTurno(
+      $fecha_asistencia,
+      $now,
+      $tz,
+      (string)$tipoTurno
+    );
+
+    if (!$ventanaEntrada["ok"]) {
+      barcode_err((string)$ventanaEntrada["error"]);
+    }
+  }
+
   $tolMin = defined("RETARDO_TOLERANCIA_MINUTOS") ? (int)RETARDO_TOLERANCIA_MINUTOS : 0;
   $inicioTurno = new DateTimeImmutable($fecha_asistencia . " " . $horaInicio, $tz);
   $limite = $inicioTurno->modify("+" . $tolMin . " minutes");
@@ -151,7 +171,7 @@ if (!$asistencia || empty($asistencia["hora_entrada"])) {
   $margenAntesMin = defined("ASISTENCIA_MARGEN_ANTES_MINUTOS") ? max(0, (int)ASISTENCIA_MARGEN_ANTES_MINUTOS) : 0;
   $inicioPermitido = $inicioTurno->modify("-" . $margenAntesMin . " minutes");
 
-  if ($now->getTimestamp() < $inicioPermitido->getTimestamp()) {
+  if (!$tieneVentanaTurno && $now->getTimestamp() < $inicioPermitido->getTimestamp()) {
     barcode_err("Fuera del margen permitido");
   }
 
@@ -172,6 +192,13 @@ if (!$asistencia || empty($asistencia["hora_entrada"])) {
   }
 
   $msg = "Entrada registrada: " . $empleado["nombres"] . " " . $empleado["apellidos"];
+
+  if ($tieneVentanaTurno) {
+    $msg = $estado === "RETARDO"
+      ? "Asistencia registrada correctamente. Entrada con retardo."
+      : "Asistencia registrada correctamente. Entrada puntual.";
+  }
+
   barcode_redirect("", [
     "barcode_msg" => $msg,
     "barcode_type" => "success",
@@ -183,6 +210,19 @@ if (!$asistencia || empty($asistencia["hora_entrada"])) {
   ]);
 
 } elseif (empty($asistencia["hora_salida"])) {
+  if ($tieneVentanaTurno) {
+    $ventanaSalida = validarVentanaSalidaTurno(
+      $fecha_asistencia,
+      $now,
+      $tz,
+      (string)$tipoTurno
+    );
+
+    if (!$ventanaSalida["ok"]) {
+      barcode_err((string)$ventanaSalida["error"]);
+    }
+  }
+
   $salidaCalculada = calcularSalidaAsistencia(
   $fecha_asistencia,
   (string)$asistencia["hora_entrada"],
@@ -204,6 +244,18 @@ $minutosSalidaTardia =
 $observacionSistema =
   $salidaCalculada["observacion_sistema"];
 
+if ($tieneVentanaTurno) {
+  $salidaEstado = "NORMAL";
+  $minutosSalidaTardia = 0;
+  $observacionSistema = null;
+
+  $observacionPrevia = trim((string)($asistencia["observacion_sistema"] ?? ""));
+
+  if (stripos($observacionPrevia, "Excepción administrativa") !== false) {
+    $observacionSistema = $observacionPrevia;
+  }
+}
+
 $upd = $pdo->prepare("
   UPDATE asistencias
   SET hora_salida = ?,
@@ -224,6 +276,11 @@ $upd->execute([
 ]);
 
 $msg = "Salida registrada: " . $empleado["nombres"] . " " . $empleado["apellidos"];
+
+if ($tieneVentanaTurno) {
+  $msg = "Salida registrada correctamente.";
+}
+
   barcode_redirect("", [
     "barcode_msg" => $msg,
     "barcode_type" => "success",
@@ -236,6 +293,10 @@ $msg = "Salida registrada: " . $empleado["nombres"] . " " . $empleado["apellidos
   ]);
 
 } else {
-  barcode_err("Ya registrÓ entrada y salida hoy");
+  $mensajeDuplicado = $tieneVentanaTurno
+    ? "Ya existe un registro de entrada y salida para esta jornada."
+    : "Ya registró entrada y salida hoy";
+
+  barcode_err($mensajeDuplicado);
 }
 

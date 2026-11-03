@@ -1403,6 +1403,8 @@ function marcarAsistenciasSinSalidaVencidas(
       a.fecha,
       a.hora_entrada,
       a.observacion_sistema,
+      t.id AS turno_id,
+      t.nombre AS turno_nombre,
       t.hora_inicio,
       t.hora_fin
     FROM asistencias a
@@ -1462,22 +1464,35 @@ function marcarAsistenciasSinSalidaVencidas(
         (string)($fila["hora_fin"] ?? "")
       );
 
-      if ($horaFin === "") {
-        continue;
-      }
-
-      $finTurno = new DateTimeImmutable(
-        (string)$fila["fecha"] .
-        " " .
-        $horaFin,
-        $tz
+      $tipoTurnoFila = tipoTurnoVentanas(
+        (string)($fila["turno_nombre"] ?? ""),
+        (int)($fila["turno_id"] ?? 0)
       );
 
-      if (
-        $horaInicio !== "" &&
-        $horaInicio > $horaFin
-      ) {
-        $finTurno = $finTurno->modify("+1 day");
+      if ($tipoTurnoFila !== null) {
+        $finTurno = limiteSalidaTurno(
+          (string)$fila["fecha"],
+          $tz,
+          $tipoTurnoFila
+        );
+      } else {
+        if ($horaFin === "") {
+          continue;
+        }
+
+        $finTurno = new DateTimeImmutable(
+          (string)$fila["fecha"] .
+          " " .
+          $horaFin,
+          $tz
+        );
+
+        if (
+          $horaInicio !== "" &&
+          $horaInicio > $horaFin
+        ) {
+          $finTurno = $finTurno->modify("+1 day");
+        }
       }
 
       if (
@@ -1525,6 +1540,229 @@ function marcarAsistenciasSinSalidaVencidas(
 
   return $actualizadas;
 }
+/**
+ * Compara el turno asignado con un id o nombre configurado.
+ * La identificacion siempre parte de la asignacion del trabajador.
+ */
+function turnoCoincideConfigurado(
+  ?string $turnoNombre,
+  ?int $turnoId,
+  string $constId,
+  string $constNombre
+): bool {
+  $idConfig = defined($constId)
+    ? (int)constant($constId)
+    : 0;
+
+  if (
+    $turnoId !== null &&
+    (int)$turnoId > 0 &&
+    $idConfig > 0 &&
+    (int)$turnoId === $idConfig
+  ) {
+    return true;
+  }
+
+  $nombre = strtoupper(trim((string)$turnoNombre));
+  $nombreConfig = strtoupper(
+    trim(
+      (string)(defined($constNombre)
+        ? constant($constNombre)
+        : "")
+    )
+  );
+
+  if ($nombre === "" || $nombreConfig === "") {
+    return false;
+  }
+
+  return $nombre === $nombreConfig;
+}
+
+function esPrimerTurno(?string $turnoNombre, ?int $turnoId = null): bool {
+  return turnoCoincideConfigurado(
+    $turnoNombre,
+    $turnoId,
+    "PRIMER_TURNO_ID",
+    "PRIMER_TURNO_NOMBRE"
+  );
+}
+
+function esSegundoTurno(?string $turnoNombre, ?int $turnoId = null): bool {
+  return turnoCoincideConfigurado(
+    $turnoNombre,
+    $turnoId,
+    "SEGUNDO_TURNO_ID",
+    "SEGUNDO_TURNO_NOMBRE"
+  );
+}
+
+/**
+ * Devuelve PRIMER, SEGUNDO o null segun el turno asignado.
+ * Un turno sin ventanas conserva el comportamiento anterior.
+ */
+function tipoTurnoVentanas(
+  ?string $turnoNombre,
+  ?int $turnoId = null
+): ?string {
+  if (esPrimerTurno($turnoNombre, $turnoId)) {
+    return "PRIMER";
+  }
+
+  if (esSegundoTurno($turnoNombre, $turnoId)) {
+    return "SEGUNDO";
+  }
+
+  return null;
+}
+
+function configuracionVentanaTurno(string $tipoTurno): array {
+  if ($tipoTurno === "SEGUNDO") {
+    return [
+      "entrada_desde" => defined("SEGUNDO_TURNO_ENTRADA_DESDE")
+        ? (string)constant("SEGUNDO_TURNO_ENTRADA_DESDE")
+        : "11:55:00",
+      "entrada_hasta" => defined("SEGUNDO_TURNO_ENTRADA_HASTA")
+        ? (string)constant("SEGUNDO_TURNO_ENTRADA_HASTA")
+        : "13:00:00",
+      "salida_desde" => defined("SEGUNDO_TURNO_SALIDA_DESDE")
+        ? (string)constant("SEGUNDO_TURNO_SALIDA_DESDE")
+        : "17:00:00",
+      "salida_hasta" => defined("SEGUNDO_TURNO_SALIDA_HASTA")
+        ? (string)constant("SEGUNDO_TURNO_SALIDA_HASTA")
+        : "18:00:00",
+      "entrada_error" => "No es posible registrar la entrada. El horario permitido para el segundo turno es de 11:55 AM a 1:00 PM.",
+      "salida_error" => "No es posible registrar la salida. El horario permitido es de 5:00 PM a 6:00 PM.",
+    ];
+  }
+
+  return [
+    "entrada_desde" => defined("PRIMER_TURNO_ENTRADA_DESDE")
+      ? (string)constant("PRIMER_TURNO_ENTRADA_DESDE")
+      : "06:55:00",
+    "entrada_hasta" => defined("PRIMER_TURNO_ENTRADA_HASTA")
+      ? (string)constant("PRIMER_TURNO_ENTRADA_HASTA")
+      : "08:00:00",
+    "salida_desde" => defined("PRIMER_TURNO_SALIDA_DESDE")
+      ? (string)constant("PRIMER_TURNO_SALIDA_DESDE")
+      : "15:00:00",
+    "salida_hasta" => defined("PRIMER_TURNO_SALIDA_HASTA")
+      ? (string)constant("PRIMER_TURNO_SALIDA_HASTA")
+      : "16:00:00",
+    "entrada_error" => "No es posible registrar la entrada. El horario permitido para el primer turno es de 6:55 AM a 8:00 AM.",
+    "salida_error" => "No es posible registrar la salida. El horario permitido es de 3:00 PM a 4:00 PM.",
+  ];
+}
+
+/**
+ * Rango [inicio, finExclusivo) de una ventana horaria.
+ * El limite final incluye todo el minuto configurado.
+ */
+function rangoVentanaTurno(
+  string $fechaAsistencia,
+  string $horaDesde,
+  string $horaHasta,
+  DateTimeZone $tz
+): array {
+  $inicio = new DateTimeImmutable(
+    $fechaAsistencia . " " . $horaDesde,
+    $tz
+  );
+
+  $finExclusivo = (new DateTimeImmutable(
+    $fechaAsistencia . " " . $horaHasta,
+    $tz
+  ))->modify("+1 minute");
+
+  return [
+    "inicio" => $inicio,
+    "fin_exclusivo" => $finExclusivo,
+  ];
+}
+
+/**
+ * La ventana solo autoriza o bloquea. La puntualidad se sigue
+ * calculando con hora_inicio del turno y RETARDO_TOLERANCIA_MINUTOS.
+ */
+function validarVentanaEntradaTurno(
+  string $fechaAsistencia,
+  DateTimeImmutable $ahora,
+  DateTimeZone $tz,
+  string $tipoTurno
+): array {
+  $config = configuracionVentanaTurno($tipoTurno);
+
+  $rango = rangoVentanaTurno(
+    $fechaAsistencia,
+    $config["entrada_desde"],
+    $config["entrada_hasta"],
+    $tz
+  );
+
+  if (
+    $ahora->getTimestamp() < $rango["inicio"]->getTimestamp() ||
+    $ahora->getTimestamp() >= $rango["fin_exclusivo"]->getTimestamp()
+  ) {
+    return [
+      "ok" => false,
+      "error" => $config["entrada_error"],
+    ];
+  }
+
+  return [
+    "ok" => true,
+    "error" => null,
+  ];
+}
+
+function validarVentanaSalidaTurno(
+  string $fechaAsistencia,
+  DateTimeImmutable $ahora,
+  DateTimeZone $tz,
+  string $tipoTurno
+): array {
+  $config = configuracionVentanaTurno($tipoTurno);
+
+  $rango = rangoVentanaTurno(
+    $fechaAsistencia,
+    $config["salida_desde"],
+    $config["salida_hasta"],
+    $tz
+  );
+
+  if (
+    $ahora->getTimestamp() < $rango["inicio"]->getTimestamp() ||
+    $ahora->getTimestamp() >= $rango["fin_exclusivo"]->getTimestamp()
+  ) {
+    return [
+      "ok" => false,
+      "error" => $config["salida_error"],
+    ];
+  }
+
+  return [
+    "ok" => true,
+    "error" => null,
+  ];
+}
+
+/**
+ * Momento a partir del cual una asistencia sin salida se considera
+ * vencida, segun la ventana del turno asignado.
+ */
+function limiteSalidaTurno(
+  string $fechaAsistencia,
+  DateTimeZone $tz,
+  string $tipoTurno
+): DateTimeImmutable {
+  $config = configuracionVentanaTurno($tipoTurno);
+
+  return (new DateTimeImmutable(
+    $fechaAsistencia . " " . $config["salida_hasta"],
+    $tz
+  ))->modify("+1 minute");
+}
+
 function calcularSalidaAsistencia(
   string $fechaAsistencia,
   string $horaEntrada,

@@ -81,6 +81,34 @@ if (!puedeVerTurno($emp["turno_nombre"] ?? "")) {
   exit;
 }
 
+$tipoTurno = tipoTurnoVentanas(
+  (string)($emp["turno_nombre"] ?? ""),
+  (int)($emp["turno_id"] ?? 0)
+);
+
+$tieneVentanaTurno = $tipoTurno !== null;
+
+$esExcepcionAdmin = false;
+$motivoExcepcion = trim((string)($_POST["motivo_excepcion"] ?? ""));
+
+if ($tieneVentanaTurno && (string)($_POST["excepcion_admin"] ?? "") === "1") {
+  if (!esRolGlobal()) {
+    header("Location: " . asistenciaReturnUrl("err", "No tienes permiso para registrar excepciones administrativas"));
+    exit;
+  }
+
+  if ($motivoExcepcion === "") {
+    header("Location: " . asistenciaReturnUrl("err", "Debe indicar el motivo de la excepción administrativa"));
+    exit;
+  }
+
+  if (strlen($motivoExcepcion) > 120) {
+    $motivoExcepcion = substr($motivoExcepcion, 0, 120);
+  }
+
+  $esExcepcionAdmin = true;
+}
+
 $horaInicio = $emp["hora_inicio"] ?: "07:00:00";
 $horaFin    = $emp["hora_fin"] ?: null;
 
@@ -95,8 +123,22 @@ if ($horaFin !== null) {
   }
 }
 
+if ($tieneVentanaTurno && !$esExcepcionAdmin) {
+  $ventanaSalida = validarVentanaSalidaTurno(
+    $fecha_asistencia,
+    $now,
+    $tz,
+    (string)$tipoTurno
+  );
+
+  if (!$ventanaSalida["ok"]) {
+    header("Location: " . asistenciaReturnUrl("err", (string)$ventanaSalida["error"]));
+    exit;
+  }
+}
+
 $stmt = $pdo->prepare("
-  SELECT id, estado, hora_entrada, hora_salida
+  SELECT id, estado, hora_entrada, hora_salida, observacion_sistema
   FROM asistencias
   WHERE empleado_id = ? AND fecha = ?
   LIMIT 1
@@ -105,12 +147,18 @@ $stmt->execute([$empleado_id, $fecha_asistencia]);
 $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$row || empty($row["hora_entrada"])) {
-  header("Location: " . asistenciaReturnUrl("err", "No tiene entrada registrada para esa fecha"));
+  $mensajeSinEntrada = $tieneVentanaTurno
+    ? "No es posible registrar la salida porque no existe una entrada registrada."
+    : "No tiene entrada registrada para esa fecha";
+  header("Location: " . asistenciaReturnUrl("err", $mensajeSinEntrada));
   exit;
 }
 
 if (!empty($row["hora_salida"])) {
-  header("Location: " . asistenciaReturnUrl("err", "Ya tiene salida registrada para esa fecha"));
+  $mensajeSalidaDuplicada = $tieneVentanaTurno
+    ? "Ya existe un registro de salida para esta jornada."
+    : "Ya tiene salida registrada para esa fecha";
+  header("Location: " . asistenciaReturnUrl("err", $mensajeSalidaDuplicada));
   exit;
 }
 
@@ -142,6 +190,30 @@ $minutosSalidaTardia =
 $observacionSistema =
   $salidaCalculada["observacion_sistema"];
 
+if ($tieneVentanaTurno) {
+  $salidaEstado = "NORMAL";
+  $minutosSalidaTardia = 0;
+  $observacionSistema = null;
+
+  $observacionPrevia = trim((string)($row["observacion_sistema"] ?? ""));
+
+  if (stripos($observacionPrevia, "Excepción administrativa") !== false) {
+    $observacionSistema = $observacionPrevia;
+  }
+}
+
+if ($esExcepcionAdmin) {
+  $notaExcepcion = "Excepción administrativa justificada: " . $motivoExcepcion;
+  $observacionSistema =
+    trim((string)$observacionSistema) === ""
+      ? $notaExcepcion
+      : $observacionSistema . " | " . $notaExcepcion;
+}
+
+if (strlen((string)$observacionSistema) > 255) {
+  $observacionSistema = substr((string)$observacionSistema, 0, 255);
+}
+
 $upd = $pdo->prepare("
   UPDATE asistencias
   SET hora_salida = ?,
@@ -161,7 +233,12 @@ $upd->execute([
   (int)$row["id"]
 ]);
 $mensaje = "Salida registrada con éxito";
-if ($salidaEstado === "SALIDA_TARDIA") {
+
+if ($esExcepcionAdmin) {
+  $mensaje = "Salida registrada como excepción administrativa.";
+} elseif ($tieneVentanaTurno) {
+  $mensaje = "Salida registrada correctamente.";
+} elseif ($salidaEstado === "SALIDA_TARDIA") {
   $mensaje = "Salida registrada como tardía ({$minutosSalidaTardia} min)";
 } elseif ($salidaEstado === "SIN_HORARIO") {
   $mensaje = "Salida registrada sin comparación de horario";

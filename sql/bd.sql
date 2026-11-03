@@ -162,7 +162,7 @@ CREATE TABLE IF NOT EXISTS reposos (
 ) ENGINE=InnoDB;
 INSERT IGNORE INTO turnos (id, nombre, hora_inicio, hora_fin) VALUES
 (1, 'MATUTINO', '07:00:00', '12:00:00'),
-(2, 'VESPERTINO', '13:00:00', '17:00:00'),
+(2, 'VESPERTINO', '12:00:00', '17:00:00'),
 (3, 'COMPLETO', '07:00:00', '17:00:00');
 
 INSERT IGNORE INTO cargos (nombre, descripcion) VALUES
