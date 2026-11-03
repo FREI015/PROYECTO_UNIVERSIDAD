@@ -345,6 +345,13 @@ if ($esIndividual) {
   $empleados = $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
+if (!tieneAlcanceGlobalTurnos()) {
+  $empleados = array_values(array_filter(
+    $empleados,
+    static fn(array $emp): bool => puedeVerTurno($emp["turno"] ?? "")
+  ));
+}
+
 if (!$empleados) {
   $pdf = new TCPDF("P", "mm", "A4", true, "UTF-8", false);
   $pdf->SetCreator("Control de Asistencia");
@@ -538,12 +545,21 @@ foreach ($empleados as $emp) {
   foreach ($dates as $d) {
     $st = $statusMap[$eid][$d]['estado'];
 
-    if ($st === "A_TIEMPO" || $st === "SALIDA_TARDIA") $cnt["a_tiempo"]++;
-    if ($st === "SALIDA_TARDIA") $cnt["salida_tardia"]++;
-    elseif ($st === 'RETARDO') $cnt['retardo']++;
-    elseif ($st === 'PERMISO') $cnt['permiso']++;
-    elseif ($st === 'REPOSO') $cnt['reposo']++;
-    else $cnt['ausente']++;
+    if ($st === "A_TIEMPO" || $st === "SALIDA_TARDIA") {
+      $cnt["a_tiempo"]++;
+    } elseif ($st === "RETARDO") {
+      $cnt["retardo"]++;
+    } elseif ($st === "PERMISO") {
+      $cnt["permiso"]++;
+    } elseif ($st === "REPOSO") {
+      $cnt["reposo"]++;
+    } else {
+      $cnt["ausente"]++;
+    }
+
+    if ($st === "SALIDA_TARDIA") {
+      $cnt["salida_tardia"]++;
+    }
 
     $cnt['asistio'] = $cnt['a_tiempo'] + $cnt['retardo'];
 

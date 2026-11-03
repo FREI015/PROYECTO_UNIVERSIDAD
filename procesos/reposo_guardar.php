@@ -82,11 +82,57 @@ if (strtoupper($emp["estado"]) !== "ACTIVO") {
 $creado_por = (int)($_SESSION["user"]["id"] ?? $_SESSION["usuario_id"] ?? 0);
 $creado_por = $creado_por > 0 ? $creado_por : null;
 
-$ins = $pdo->prepare("
-  INSERT INTO reposos (empleado_id, tipo, fecha_inicio, fecha_fin, motivo, observaciones, estado, creado_por, creado_en)
-  VALUES (?, ?, ?, ?, ?, ?, 'ACTIVO', ?, NOW())
-");
-$ins->execute([$empleado_id, $tipo, $fecha_inicio, $fecha_fin, $motivo, $observaciones, $creado_por]);
+try {
+  $pdo->beginTransaction();
+
+  // Serializar la creacion de reposos del mismo empleado.
+  $lock = $pdo->prepare("SELECT estado FROM empleados WHERE id = ? FOR UPDATE");
+  $lock->execute([$empleado_id]);
+  $estadoActual = strtoupper(trim((string)$lock->fetchColumn()));
+
+  if ($estadoActual !== "ACTIVO") {
+    $pdo->rollBack();
+    header("Location: " . BASE_URL . "/modulos/reposos.php?err=" . urlencode("El empleado no esta activo."));
+    exit;
+  }
+
+  // Dos rangos se solapan cuando inicio1 <= fin2 y fin1 >= inicio2.
+  $conflicto = $pdo->prepare("
+    SELECT id
+    FROM reposos
+    WHERE empleado_id = ?
+      AND estado = 'ACTIVO'
+      AND fecha_inicio <= ?
+      AND fecha_fin >= ?
+    LIMIT 1
+  ");
+
+  $conflicto->execute([$empleado_id, $fecha_fin, $fecha_inicio]);
+
+  if ($conflicto->fetchColumn() !== false) {
+    $pdo->rollBack();
+    header("Location: " . BASE_URL . "/modulos/reposos.php?err=" . urlencode("Ya existe un reposo activo que coincide con esas fechas."));
+    exit;
+  }
+
+  $ins = $pdo->prepare("
+    INSERT INTO reposos (empleado_id, tipo, fecha_inicio, fecha_fin, motivo, observaciones, estado, creado_por, creado_en)
+    VALUES (?, ?, ?, ?, ?, ?, 'ACTIVO', ?, NOW())
+  ");
+
+  $ins->execute([$empleado_id, $tipo, $fecha_inicio, $fecha_fin, $motivo, $observaciones, $creado_por]);
+
+  $pdo->commit();
+
+} catch (Throwable $e) {
+  if ($pdo->inTransaction()) {
+    $pdo->rollBack();
+  }
+
+  error_log("Error al guardar reposo: " . $e->getMessage());
+  header("Location: " . BASE_URL . "/modulos/reposos.php?err=" . urlencode("No se pudo guardar el reposo."));
+  exit;
+}
 
 header("Location: " . BASE_URL . "/modulos/reposos.php?msg=" . urlencode("Reposo guardado"));
 exit;

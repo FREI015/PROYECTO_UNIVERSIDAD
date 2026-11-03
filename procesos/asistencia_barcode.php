@@ -1,29 +1,42 @@
 <?php
 require_once __DIR__ . "/../includes/config.php";
 require_once __DIR__ . "/../includes/funciones.php";
+
+$ipKiosco = (string)($_SERVER["REMOTE_ADDR"] ?? "");
+if (!in_array($ipKiosco, ["127.0.0.1", "::1"], true)) {
+  http_response_code(403);
+  exit("El kiosco solo puede utilizarse desde esta computadora.");
+}
 require_once __DIR__ . "/../includes/conexion.php";
 
-$redirect_to = trim($_POST["redirect_to"] ?? "");
-$redirect_default = BASE_URL . "/modulos/asistencias.php";
-function barcode_resolve_redirect(string $redirect_to, string $redirect_default): string {
-  $value = trim($redirect_to);
-  $kioskUrl = BASE_URL . "/login_empleado.php";
-
-  if ($value === "") {
-    return $redirect_default;
-  }
-
-  if ($value === $kioskUrl || $value === "/login_empleado.php" || $value === "login_empleado.php") {
-    return $kioskUrl;
-  }
-
-  return $redirect_default;
-}
-
-$redirect_url = barcode_resolve_redirect($redirect_to, $redirect_default);
+$redirect_url = BASE_URL . "/login_empleado.php";
 
 function barcode_redirect($url, $params = []) {
-  global $redirect_url;
+  global $redirect_url, $pdo;
+
+  if ($pdo instanceof PDO && $pdo->inTransaction()) {
+    if (($params["barcode_type"] ?? "") === "success") {
+      try {
+        $pdo->commit();
+      } catch (Throwable $e) {
+        if ($pdo->inTransaction()) {
+          $pdo->rollBack();
+        }
+        error_log("Error al confirmar asistencia: " . $e->getMessage());
+        $params = [
+          "barcode_msg" => "No se pudo confirmar la asistencia.",
+          "barcode_type" => "error"
+        ];
+      }
+    } else {
+      $pdo->rollBack();
+    }
+  }
+
+  if (($params["barcode_type"] ?? "") === "success" && isset($params["empleado_id"])) {
+    $_SESSION["kiosk_ok_empleado_id"] = (int)$params["empleado_id"];
+    unset($params["empleado_id"]);
+  }
   $base = $redirect_url;
   $sep = strpos($base, "?") === false ? "?" : "&";
   foreach ($params as $k => $v) {
@@ -44,8 +57,6 @@ if ($_SERVER["REQUEST_METHOD"] !== "POST") {
 
 $csrf_redirect_url = $redirect_url . (strpos($redirect_url, "?") === false ? "?" : "&") . "barcode_msg=" . urlencode("Solicitud invalida. Intenta nuevamente.") . "&barcode_type=error";
 verifyCsrfOrRedirect($csrf_redirect_url);
-$es_kiosko = ($redirect_url === BASE_URL . "/login_empleado.php");
-if ($es_kiosko) {
   $ahoraRate = time();
   $ventanaRate = $ahoraRate - 60;
   $historialIntentos = $_SESSION["kiosk_barcode_rate"] ?? [];
@@ -68,13 +79,7 @@ if ($es_kiosko) {
 
   $intentosRecientes[] = $ahoraRate;
   $_SESSION["kiosk_barcode_rate"] = $intentosRecientes;
-}
 
-if ($redirect_to === "") {
-  requireLogin();
-  verifyCsrfOrRedirect($redirect_default . "?err=" . urlencode("Solicitud inválida. Intenta nuevamente."));
-  requirePermiso("marcar_asistencia", $redirect_default);
-}
 
 $codigo_barra = trim($_POST["codigo_barra"] ?? "");
 if ($codigo_barra === "") {
@@ -103,9 +108,6 @@ if (strtoupper(trim((string)$emp["estado"])) !== "ACTIVO") {
   barcode_err("El empleado no está ACTIVO");
 }
 
-if (!$es_kiosko && !puedeVerTurno($emp["turno_nombre"] ?? "")) {
-  barcode_err("No tienes permiso para marcar asistencia de este turno");
-}
 
 $tipoTurno = tipoTurnoVentanas(
   (string)($emp["turno_nombre"] ?? ""),
@@ -143,6 +145,19 @@ if ($stmt->fetch()) {
   barcode_err("No puedes marcar: permiso activo");
 }
 
+$pdo->beginTransaction();
+
+// Bloquea al empleado para evitar marcajes simultaneos.
+$bloqueoEmpleado = $pdo->prepare(
+  "SELECT id FROM empleados WHERE id = ? FOR UPDATE"
+);
+$bloqueoEmpleado->execute([$empleado_id]);
+
+if ($bloqueoEmpleado->fetchColumn() === false) {
+  barcode_err("Empleado no existe");
+}
+
+// Conserva observacion_sistema y la proteccion de concurrencia.
 $stmt = $pdo->prepare("SELECT id, hora_entrada, hora_salida, estado, observacion_sistema FROM asistencias WHERE empleado_id=? AND fecha=? LIMIT 1");
 $stmt->execute([$empleado_id, $fecha_asistencia]);
 $asistencia = $stmt->fetch(PDO::FETCH_ASSOC);

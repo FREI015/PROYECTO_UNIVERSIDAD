@@ -5,7 +5,7 @@
 
   Este script NO borra datos.
   Corrige inconsistencias reales detectadas:
-  - empleados.codigo_barra faltante en bd.sql.
+  - empleados.codigo_barra ya existe en bd.sql; verificar esquemas antiguos.
   - migracion de codigo_barra integrada.
   - cargos base iniciales.
   - indices para consultas frecuentes.
