@@ -1597,8 +1597,17 @@ function esSegundoTurno(?string $turnoNombre, ?int $turnoId = null): bool {
   );
 }
 
+function esTurnoCompleto(?string $turnoNombre, ?int $turnoId = null): bool {
+  return turnoCoincideConfigurado(
+    $turnoNombre,
+    $turnoId,
+    "TURNO_COMPLETO_ID",
+    "TURNO_COMPLETO_NOMBRE"
+  );
+}
+
 /**
- * Devuelve PRIMER, SEGUNDO o null segun el turno asignado.
+ * Devuelve PRIMER, SEGUNDO, COMPLETO o null segun el turno asignado.
  * Un turno sin ventanas conserva el comportamiento anterior.
  */
 function tipoTurnoVentanas(
@@ -1613,10 +1622,33 @@ function tipoTurnoVentanas(
     return "SEGUNDO";
   }
 
+  if (esTurnoCompleto($turnoNombre, $turnoId)) {
+    return "COMPLETO";
+  }
+
   return null;
 }
 
 function configuracionVentanaTurno(string $tipoTurno): array {
+  if ($tipoTurno === "COMPLETO") {
+    return [
+      "entrada_desde" => defined("PRIMER_TURNO_ENTRADA_DESDE")
+        ? (string)constant("PRIMER_TURNO_ENTRADA_DESDE")
+        : "06:55:00",
+      "entrada_hasta" => defined("PRIMER_TURNO_ENTRADA_HASTA")
+        ? (string)constant("PRIMER_TURNO_ENTRADA_HASTA")
+        : "08:00:00",
+      "salida_desde" => defined("SEGUNDO_TURNO_SALIDA_DESDE")
+        ? (string)constant("SEGUNDO_TURNO_SALIDA_DESDE")
+        : "17:00:00",
+      "salida_hasta" => defined("SEGUNDO_TURNO_SALIDA_HASTA")
+        ? (string)constant("SEGUNDO_TURNO_SALIDA_HASTA")
+        : "18:00:00",
+      "entrada_error" => "No es posible registrar la entrada. El horario permitido para el turno completo es de 6:55 AM a 8:00 AM.",
+      "salida_error" => "No es posible registrar la salida. El horario permitido es de 5:00 PM a 6:00 PM.",
+    ];
+  }
+
   if ($tipoTurno === "SEGUNDO") {
     return [
       "entrada_desde" => defined("SEGUNDO_TURNO_ENTRADA_DESDE")

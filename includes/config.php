@@ -144,3 +144,18 @@ if (!defined("SEGUNDO_TURNO_SALIDA_DESDE")) {
 if (!defined("SEGUNDO_TURNO_SALIDA_HASTA")) {
   define("SEGUNDO_TURNO_SALIDA_HASTA", "18:00:00");
 }
+
+/**
+ * Ventanas horarias del turno completo.
+ *
+ * Reutiliza la entrada del primer turno y la salida del segundo turno.
+ * No se duplican horarios: cualquier ajuste en esas ventanas se refleja
+ * automaticamente en el turno completo.
+ */
+if (!defined("TURNO_COMPLETO_ID")) {
+  define("TURNO_COMPLETO_ID", 3);
+}
+
+if (!defined("TURNO_COMPLETO_NOMBRE")) {
+  define("TURNO_COMPLETO_NOMBRE", "COMPLETO");
+}
