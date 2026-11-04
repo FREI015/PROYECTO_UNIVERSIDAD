@@ -171,7 +171,9 @@ if (!$asistencia || empty($asistencia["hora_entrada"])) {
       $fecha_asistencia,
       $now,
       $tz,
-      (string)$tipoTurno
+      (string)$tipoTurno,
+      (string)$horaInicio,
+      $horaFin !== null ? (string)$horaFin : null
     );
 
     if (!$ventanaEntrada["ok"]) {
@@ -230,7 +232,9 @@ if (!$asistencia || empty($asistencia["hora_entrada"])) {
       $fecha_asistencia,
       $now,
       $tz,
-      (string)$tipoTurno
+      (string)$tipoTurno,
+      (string)$horaInicio,
+      $horaFin !== null ? (string)$horaFin : null
     );
 
     if (!$ventanaSalida["ok"]) {
@@ -260,14 +264,11 @@ $observacionSistema =
   $salidaCalculada["observacion_sistema"];
 
 if ($tieneVentanaTurno) {
-  $salidaEstado = "NORMAL";
-  $minutosSalidaTardia = 0;
-  $observacionSistema = null;
-
   $observacionPrevia = trim((string)($asistencia["observacion_sistema"] ?? ""));
-
-  if (stripos($observacionPrevia, "Excepción administrativa") !== false) {
-    $observacionSistema = $observacionPrevia;
+  if ($observacionPrevia !== '') {
+    $observacionSistema = trim((string)$observacionSistema) === ''
+      ? $observacionPrevia
+      : $observacionPrevia . ' | ' . $observacionSistema;
   }
 }
 

@@ -79,6 +79,33 @@ if (strtoupper($emp["estado"]) !== "ACTIVO") {
   exit;
 }
 
+$justificativoTmp = null;
+$justificativoExt = null;
+$justificativoGuardado = null;
+$archivoSubido = $_FILES["justificativo"] ?? null;
+if ($archivoSubido !== null) {
+  if (!is_array($archivoSubido)) {
+    header("Location: " . BASE_URL . "/modulos/reposos.php?err=" . urlencode("Archivo invalido."));
+    exit;
+  }
+  $errorArchivo = (int)($archivoSubido["error"] ?? UPLOAD_ERR_NO_FILE);
+  if ($errorArchivo !== UPLOAD_ERR_NO_FILE) {
+    $tmp = (string)($archivoSubido["tmp_name"] ?? "");
+    $size = (int)($archivoSubido["size"] ?? 0);
+    if ($errorArchivo !== UPLOAD_ERR_OK || $size <= 0 || $size > 5 * 1024 * 1024 || !is_uploaded_file($tmp)) {
+      header("Location: " . BASE_URL . "/modulos/reposos.php?err=" . urlencode("Justificativo invalido o supera 5 MB."));
+      exit;
+    }
+    $mime = (new finfo(FILEINFO_MIME_TYPE))->file($tmp);
+    $permitidos = ["application/pdf" => "pdf", "image/jpeg" => "jpg", "image/png" => "png"];
+    if (!isset($permitidos[$mime])) {
+      header("Location: " . BASE_URL . "/modulos/reposos.php?err=" . urlencode("Solo se permiten PDF, JPG o PNG."));
+      exit;
+    }
+    $justificativoTmp = $tmp;
+    $justificativoExt = $permitidos[$mime];
+  }
+}
 $creado_por = (int)($_SESSION["user"]["id"] ?? $_SESSION["usuario_id"] ?? 0);
 $creado_por = $creado_por > 0 ? $creado_por : null;
 
@@ -115,13 +142,38 @@ try {
     exit;
   }
 
+  // Un reposo no puede coincidir con un permiso activo del empleado.
+  $conflictoPermiso = $pdo->prepare("
+    SELECT id FROM permisos
+    WHERE empleado_id = ? AND estado = 'ACTIVO'
+      AND fecha_inicio <= ? AND fecha_fin >= ?
+    LIMIT 1
+  ");
+  $conflictoPermiso->execute([$empleado_id, $fecha_fin, $fecha_inicio]);
+  if ($conflictoPermiso->fetchColumn() !== false) {
+    $pdo->rollBack();
+    header("Location: " . BASE_URL . "/modulos/reposos.php?err=" . urlencode("Las fechas coinciden con un permiso activo."));
+    exit;
+  }
+
+  $justificativoRuta = null;
+  if ($justificativoTmp !== null) {
+    $justificativoRuta = "uploads/justificativos/" . bin2hex(random_bytes(16)) . "." . $justificativoExt;
+    $destinoJustificativo = __DIR__ . "/../" . $justificativoRuta;
+    if (!is_dir(dirname($destinoJustificativo)) || !move_uploaded_file($justificativoTmp, $destinoJustificativo)) {
+      throw new RuntimeException("No fue posible guardar el justificativo.");
+    }
+    $justificativoGuardado = $destinoJustificativo;
+  }
   $ins = $pdo->prepare("
-    INSERT INTO reposos (empleado_id, tipo, fecha_inicio, fecha_fin, motivo, observaciones, estado, creado_por, creado_en)
-    VALUES (?, ?, ?, ?, ?, ?, 'ACTIVO', ?, NOW())
+    INSERT INTO reposos (empleado_id, tipo, fecha_inicio, fecha_fin, motivo, observaciones, justificativo_archivo, estado, creado_por, creado_en)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 'ACTIVO', ?, NOW())
   ");
 
-  $ins->execute([$empleado_id, $tipo, $fecha_inicio, $fecha_fin, $motivo, $observaciones, $creado_por]);
+  $ins->execute([$empleado_id, $tipo, $fecha_inicio, $fecha_fin, $motivo, $observaciones, $justificativoRuta, $creado_por]);
 
+  require_once __DIR__ . '/../includes/auditoria.php';
+  registrarAuditoria($pdo, 'CREAR_REPOSO', 'reposos', (int)$pdo->lastInsertId(), ['empleado_id' => $empleado_id]);
   $pdo->commit();
 
 } catch (Throwable $e) {
@@ -129,6 +181,9 @@ try {
     $pdo->rollBack();
   }
 
+  if ($justificativoGuardado !== null && is_file($justificativoGuardado)) {
+    @unlink($justificativoGuardado);
+  }
   error_log("Error al guardar reposo: " . $e->getMessage());
   header("Location: " . BASE_URL . "/modulos/reposos.php?err=" . urlencode("No se pudo guardar el reposo."));
   exit;

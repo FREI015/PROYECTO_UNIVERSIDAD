@@ -132,7 +132,7 @@ $totalPaginas = (int)ceil($totalReposos / $porPagina);
 
 $sqlReposos = "
   SELECT
-    r.id, r.empleado_id, r.tipo, r.fecha_inicio, r.fecha_fin, r.motivo, r.observaciones, r.estado, r.creado_en,
+    r.id, r.empleado_id, r.justificativo_archivo, r.tipo, r.fecha_inicio, r.fecha_fin, r.motivo, r.observaciones, r.estado, r.creado_en,
     CONCAT(e.nombres,' ',e.apellidos) AS empleado,
     e.cedula,
     c.nombre AS cargo,
@@ -279,7 +279,7 @@ require_once __DIR__ . "/../includes/header.php";
     <?php if ($puedeCrearReposos): ?>
 <div class="form-narrow">
       <div class="form-box">
-        <form class="reposos-form-modern" method="POST" action="../procesos/reposo_guardar.php" id="formReposo">
+        <form class="reposos-form-modern" method="POST" action="../procesos/reposo_guardar.php" id="formReposo" enctype="multipart/form-data">
     <?php echo csrfInput(); ?>
           <div class="form-grid">
 
@@ -321,6 +321,10 @@ require_once __DIR__ . "/../includes/header.php";
             <div class="field spanAll">
               <label>Observaciones</label>
               <textarea name="observaciones" placeholder="Opcional"></textarea>
+            </div>
+            <div class="field spanAll">
+              <label for="justificativo">Justificativo medico (PDF, JPG o PNG, maximo 5 MB)</label>
+              <input class="input" type="file" name="justificativo" id="justificativo" accept=".pdf,.jpg,.jpeg,.png">
             </div>
 
             <div class="spanAll">
@@ -395,13 +399,13 @@ require_once __DIR__ . "/../includes/header.php";
           <th>Tipo</th>
           <th>Desde</th>
           <th>Hasta</th>
-          <th>Estado</th>
+          <th>Estado</th><th>Justificativo</th>
           <th>Registrado por</th>
         </tr>
       </thead>
       <tbody>
         <?php if(!$reposos): ?>
-          <tr><td colspan="8">No hay reposos registrados.</td></tr>
+          <tr><td colspan="9">No hay reposos registrados.</td></tr>
         <?php endif; ?>
 
         <?php foreach($reposos as $r): ?>
@@ -413,6 +417,11 @@ require_once __DIR__ . "/../includes/header.php";
             <td><?php echo e($r["fecha_inicio"]); ?></td>
             <td><?php echo e($r["fecha_fin"]); ?></td>
             <td><?php echo e($r["estado"]); ?></td>
+            <td>
+              <?php if (!empty($r["justificativo_archivo"])): ?>
+                <a href="<?php echo e(BASE_URL); ?>/procesos/reposo_justificativo.php?id=<?php echo (int)$r["id"]; ?>">Descargar</a>
+              <?php else: ?>-<?php endif; ?>
+            </td>
             <td><?php echo e($r["creado_por_usuario"] ?: "—"); ?></td>
           </tr>
         <?php endforeach; ?>

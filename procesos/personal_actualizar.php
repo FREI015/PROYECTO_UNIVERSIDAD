@@ -242,6 +242,8 @@ try {
     $id
   ]);
 
+  require_once __DIR__ . '/../includes/auditoria.php';
+  registrarAuditoria($pdo, 'ACTUALIZAR_EMPLEADO', 'empleados', $id, ['turno_id' => $turno_id, 'cargo_id' => $cargo_id]);
   $pdo->commit();
 
   // Eliminar la foto anterior solo si se reemplazó correctamente.

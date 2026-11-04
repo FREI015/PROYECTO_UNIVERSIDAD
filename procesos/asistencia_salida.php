@@ -128,7 +128,9 @@ if ($tieneVentanaTurno && !$esExcepcionAdmin) {
     $fecha_asistencia,
     $now,
     $tz,
-    (string)$tipoTurno
+    (string)$tipoTurno,
+    (string)$horaInicio,
+    $horaFin !== null ? (string)$horaFin : null
   );
 
   if (!$ventanaSalida["ok"]) {
@@ -191,14 +193,11 @@ $observacionSistema =
   $salidaCalculada["observacion_sistema"];
 
 if ($tieneVentanaTurno) {
-  $salidaEstado = "NORMAL";
-  $minutosSalidaTardia = 0;
-  $observacionSistema = null;
-
   $observacionPrevia = trim((string)($row["observacion_sistema"] ?? ""));
-
   if (stripos($observacionPrevia, "Excepción administrativa") !== false) {
-    $observacionSistema = $observacionPrevia;
+    $observacionSistema = trim((string)$observacionSistema) === ''
+      ? $observacionPrevia
+      : $observacionPrevia . ' | ' . $observacionSistema;
   }
 }
 

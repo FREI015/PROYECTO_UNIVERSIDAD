@@ -1473,7 +1473,9 @@ function marcarAsistenciasSinSalidaVencidas(
         $finTurno = limiteSalidaTurno(
           (string)$fila["fecha"],
           $tz,
-          $tipoTurnoFila
+          $tipoTurnoFila,
+          $horaInicio,
+          $horaFin
         );
       } else {
         if ($horaFin === "") {
@@ -1598,8 +1600,8 @@ function esSegundoTurno(?string $turnoNombre, ?int $turnoId = null): bool {
 }
 
 /**
- * Devuelve PRIMER, SEGUNDO o null segun el turno asignado.
- * Un turno sin ventanas conserva el comportamiento anterior.
+ * Devuelve PRIMER, SEGUNDO, COMPLETO o null segun el turno asignado.
+ * Los tres turnos institucionales aplican ventanas de marcaje.
  */
 function tipoTurnoVentanas(
   ?string $turnoNombre,
@@ -1613,25 +1615,39 @@ function tipoTurnoVentanas(
     return "SEGUNDO";
   }
 
+  if (strtoupper(trim((string)$turnoNombre)) === "COMPLETO" || (int)$turnoId === 3) {
+    return "COMPLETO";
+  }
+
   return null;
 }
 
 function configuracionVentanaTurno(string $tipoTurno): array {
+  if ($tipoTurno === "COMPLETO") {
+    return [
+      "entrada_desde" => "06:55:00",
+      "entrada_hasta" => "09:00:00",
+      "salida_desde" => "17:00:00",
+      "salida_hasta" => "18:00:00",
+      "entrada_error" => "Entrada fuera del horario permitido del turno completo.",
+      "salida_error" => "Salida fuera del horario permitido del turno completo.",
+    ];
+  }
   if ($tipoTurno === "SEGUNDO") {
     return [
       "entrada_desde" => defined("SEGUNDO_TURNO_ENTRADA_DESDE")
         ? (string)constant("SEGUNDO_TURNO_ENTRADA_DESDE")
-        : "11:55:00",
+        : "12:55:00",
       "entrada_hasta" => defined("SEGUNDO_TURNO_ENTRADA_HASTA")
         ? (string)constant("SEGUNDO_TURNO_ENTRADA_HASTA")
-        : "13:00:00",
+        : "15:00:00",
       "salida_desde" => defined("SEGUNDO_TURNO_SALIDA_DESDE")
         ? (string)constant("SEGUNDO_TURNO_SALIDA_DESDE")
         : "17:00:00",
       "salida_hasta" => defined("SEGUNDO_TURNO_SALIDA_HASTA")
         ? (string)constant("SEGUNDO_TURNO_SALIDA_HASTA")
         : "18:00:00",
-      "entrada_error" => "No es posible registrar la entrada. El horario permitido para el segundo turno es de 11:55 AM a 1:00 PM.",
+      "entrada_error" => "No es posible registrar la entrada. El horario permitido para el segundo turno es de 12:55 PM a 3:00 PM.",
       "salida_error" => "No es posible registrar la salida. El horario permitido es de 5:00 PM a 6:00 PM.",
     ];
   }
@@ -1642,16 +1658,46 @@ function configuracionVentanaTurno(string $tipoTurno): array {
       : "06:55:00",
     "entrada_hasta" => defined("PRIMER_TURNO_ENTRADA_HASTA")
       ? (string)constant("PRIMER_TURNO_ENTRADA_HASTA")
-      : "08:00:00",
+      : "09:00:00",
     "salida_desde" => defined("PRIMER_TURNO_SALIDA_DESDE")
       ? (string)constant("PRIMER_TURNO_SALIDA_DESDE")
-      : "15:00:00",
+      : "12:00:00",
     "salida_hasta" => defined("PRIMER_TURNO_SALIDA_HASTA")
       ? (string)constant("PRIMER_TURNO_SALIDA_HASTA")
-      : "16:00:00",
-    "entrada_error" => "No es posible registrar la entrada. El horario permitido para el primer turno es de 6:55 AM a 8:00 AM.",
-    "salida_error" => "No es posible registrar la salida. El horario permitido es de 3:00 PM a 4:00 PM.",
+      : "13:00:00",
+    "entrada_error" => "No es posible registrar la entrada. El horario permitido para el primer turno es de 6:55 AM a 9:00 AM.",
+    "salida_error" => "No es posible registrar la salida. El horario permitido es de 12:00 PM a 1:00 PM.",
   ];
+}
+
+/**
+ * Ventanas de marcaje basadas en las horas del turno guardadas en MySQL.
+ * Entrada: 5 minutos antes y 120 minutos despues del inicio.
+ * Salida: desde la hora de fin hasta 60 minutos despues.
+ * Si no existe horario valido, conserva los valores de configuracion.
+ */
+function configuracionVentanaTurnoEmpleado(
+  string $tipoTurno,
+  ?string $horaInicio,
+  ?string $horaFin
+): array {
+  $config = configuracionVentanaTurno($tipoTurno);
+  $hi = trim((string)$horaInicio);
+  $hf = trim((string)$horaFin);
+  if (!preg_match('/^([01]\d|2[0-3]):[0-5]\d:[0-5]\d$/', $hi)
+      || !preg_match('/^([01]\d|2[0-3]):[0-5]\d:[0-5]\d$/', $hf)
+      || $hi >= $hf) {
+    return $config;
+  }
+  $inicio = new DateTimeImmutable('2000-01-01 ' . $hi);
+  $fin = new DateTimeImmutable('2000-01-01 ' . $hf);
+  $config['entrada_desde'] = $inicio->modify('-5 minutes')->format('H:i:s');
+  $config['entrada_hasta'] = $inicio->modify('+120 minutes')->format('H:i:s');
+  $config['salida_desde'] = $fin->format('H:i:s');
+  $config['salida_hasta'] = $fin->modify('+60 minutes')->format('H:i:s');
+  $config['entrada_error'] = 'Entrada permitida entre ' . $config['entrada_desde'] . ' y ' . $config['entrada_hasta'] . '.';
+  $config['salida_error'] = 'Salida permitida entre ' . $config['salida_desde'] . ' y ' . $config['salida_hasta'] . '.';
+  return $config;
 }
 
 /**
@@ -1688,9 +1734,11 @@ function validarVentanaEntradaTurno(
   string $fechaAsistencia,
   DateTimeImmutable $ahora,
   DateTimeZone $tz,
-  string $tipoTurno
+  string $tipoTurno,
+  ?string $horaInicio = null,
+  ?string $horaFin = null
 ): array {
-  $config = configuracionVentanaTurno($tipoTurno);
+  $config = configuracionVentanaTurnoEmpleado($tipoTurno, $horaInicio, $horaFin);
 
   $rango = rangoVentanaTurno(
     $fechaAsistencia,
@@ -1719,9 +1767,11 @@ function validarVentanaSalidaTurno(
   string $fechaAsistencia,
   DateTimeImmutable $ahora,
   DateTimeZone $tz,
-  string $tipoTurno
+  string $tipoTurno,
+  ?string $horaInicio = null,
+  ?string $horaFin = null
 ): array {
-  $config = configuracionVentanaTurno($tipoTurno);
+  $config = configuracionVentanaTurnoEmpleado($tipoTurno, $horaInicio, $horaFin);
 
   $rango = rangoVentanaTurno(
     $fechaAsistencia,
@@ -1753,9 +1803,11 @@ function validarVentanaSalidaTurno(
 function limiteSalidaTurno(
   string $fechaAsistencia,
   DateTimeZone $tz,
-  string $tipoTurno
+  string $tipoTurno,
+  ?string $horaInicio = null,
+  ?string $horaFin = null
 ): DateTimeImmutable {
-  $config = configuracionVentanaTurno($tipoTurno);
+  $config = configuracionVentanaTurnoEmpleado($tipoTurno, $horaInicio, $horaFin);
 
   return (new DateTimeImmutable(
     $fechaAsistencia . " " . $config["salida_hasta"],
@@ -1841,65 +1893,28 @@ function calcularSalidaAsistencia(
     "observacion_sistema" => $observacionSistema,
   ];
 }
-function fotoEmpleadoUrl(?string $fotoArchivo): string {
-  $fotoArchivo = trim((string)$fotoArchivo);
-
-  if ($fotoArchivo === "") {
-    return "";
+function fotoEmpleadoUrl(?string $fotoArchivo, bool $accesoKiosco = false): string {
+  $fotoArchivo = str_replace('\\', '/', trim((string)$fotoArchivo));
+  if (!preg_match('~\Auploads/empleados/([a-zA-Z0-9_.-]+\.(?:jpe?g|png|webp))\z~i', $fotoArchivo, $m)) {
+    return '';
   }
-
-  $fotoArchivo = str_replace("\\", "/", $fotoArchivo);
-  $fotoArchivo = ltrim($fotoArchivo, "/");
-
-  if (
-    str_contains($fotoArchivo, "\0") ||
-    str_contains($fotoArchivo, "../") ||
-    str_contains($fotoArchivo, "..\\")
-  ) {
-    return "";
+  if (!is_file(dirname(__DIR__) . '/uploads/empleados/' . $m[1])) {
+    return '';
   }
-
-  if (
-    !str_starts_with(
-      $fotoArchivo,
-      "uploads/empleados/"
-    )
-  ) {
-    return "";
+  $url = BASE_URL . '/procesos/foto_empleado.php?archivo=' . rawurlencode($m[1]);
+  if ($accesoKiosco) {
+    // Solo invocar en la pantalla que consume el ID de un marcaje exitoso.
+    $token = bin2hex(random_bytes(16));
+    $_SESSION['kiosk_foto_autorizada'] = [
+      'archivo' => $m[1], 'token' => $token, 'expira' => time() + 90
+    ];
+    $url .= '&k=' . rawurlencode($token);
   }
-
-  if (
-    !preg_match(
-      '/\.(jpe?g|png|webp)$/i',
-      $fotoArchivo
-    )
-  ) {
-    return "";
-  }
-
-  $rutaFisica =
-    dirname(__DIR__) .
-    DIRECTORY_SEPARATOR .
-    str_replace(
-      "/",
-      DIRECTORY_SEPARATOR,
-      $fotoArchivo
-    );
-
-  if (!is_file($rutaFisica)) {
-    return "";
-  }
-
-  $segmentos = array_map(
-    "rawurlencode",
-    explode("/", $fotoArchivo)
-  );
-
-  return BASE_URL . "/" . implode("/", $segmentos);
+  return $url;
 }
 function empleadoPorCodigoBarra(PDO $pdo, string $codigo): ?array {
-  $codigo = trim($codigo);
-  if ($codigo === "") return null;
+  $codigo = strtoupper(trim($codigo));
+  if ($codigo === "" || strlen($codigo) > 50 || preg_match('/[\s"\']/', $codigo)) return null;
   $stmt = $pdo->prepare("SELECT id, nombres, apellidos, cedula, codigo_barra FROM empleados WHERE codigo_barra = ? LIMIT 1");
   $stmt->execute([$codigo]);
   $emp = $stmt->fetch(PDO::FETCH_ASSOC);

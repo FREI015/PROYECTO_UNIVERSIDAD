@@ -231,6 +231,8 @@ try {
     );
   }
 
+  require_once __DIR__ . '/../includes/auditoria.php';
+  registrarAuditoria($pdo, 'CREAR_EMPLEADO', 'empleados', $nuevoEmpleadoId, ['turno_id' => $turno_id, 'cargo_id' => $cargo_id]);
   $pdo->commit();
 
   header(

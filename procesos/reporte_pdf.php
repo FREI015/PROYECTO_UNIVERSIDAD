@@ -187,6 +187,11 @@ function reportePdfAgregarCintillo(TCPDF $pdf): void {
   $pdf->Cell(0, 4, "E.B.N Dr. Enrique Delgado Palacios   CIRCUITO LONGARAY   Cod. Plantel OD723101   Cod. Institucional 00673395   RIF 305187355", 0, 1, "C");
   $pdf->Ln(4);
 }
+function fechaPdfValida(string $fecha): bool {
+  $dt = DateTimeImmutable::createFromFormat('!Y-m-d', $fecha);
+  return $dt !== false && $dt->format('Y-m-d') === $fecha;
+}
+
 function rangeFromPeriodo(string $periodo, string $fechaBase): array {
   $dt = new DateTime($fechaBase);
   $periodo = strtoupper(trim($periodo));
@@ -272,7 +277,18 @@ function dateListInclusive(string $desde, string $hasta): array {
   return $out;
 }
 
+require_once __DIR__ . "/../includes/calendario_laboral.php";
+
 // Inputs
+foreach (["fecha_base", "desde", "hasta"] as $claveFecha) {
+  if (isset($_GET[$claveFecha]) && !is_string($_GET[$claveFecha])) {
+    reportePdfDenegar("Parametro de fecha invalido.");
+  }
+  if (isset($_GET[$claveFecha]) && trim($_GET[$claveFecha]) !== ""
+      && !fechaPdfValida(trim($_GET[$claveFecha]))) {
+    reportePdfDenegar("Fecha invalida: " . $claveFecha);
+  }
+}
 $periodo    = strtoupper(trim($_GET["periodo"] ?? "DIARIO"));
 $fechaBase  = clampDate($_GET["fecha_base"] ?? "", date("Y-m-d"));
 $turnoIdRaw = trim($_GET["turno_id"] ?? "");
@@ -284,21 +300,30 @@ $hastaIn = trim($_GET["hasta"] ?? "");
 // Reporte individual de un empleado.
 $esIndividual = ($periodo === "INDIVIDUAL" && $empleadoId > 0);
 
-// Si el usuario pone desde/hasta, usamos ese rango; si no, calculamos por periodo/fecha_base.
-if ($desdeIn !== "" && $hastaIn !== "" && preg_match('/^\d{4}-\d{2}-\d{2}$/', $desdeIn) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $hastaIn)) {
+// Validar las fechas antes de construir listas o generar contenido PDF.
+if (($desdeIn === '') !== ($hastaIn === '')) {
+  reportePdfDenegar('Indica ambas fechas para un rango personalizado.');
+}
+if ($desdeIn !== '') {
+  if (!fechaPdfValida($desdeIn) || !fechaPdfValida($hastaIn)) {
+    reportePdfDenegar('El rango contiene una fecha invalida.');
+  }
   $desde = $desdeIn;
   $hasta = $hastaIn;
-  $label = "Rango ($desde al $hasta)";
-} elseif ($esIndividual) {
-  // Para individual, usar el rango proporcionado o mes actual
-  if ($desdeIn !== "" && $hastaIn !== "") {
-    $label = "Individual ($desde al $hasta)";
-  } else {
-    [$desde, $hasta, $label] = rangeFromPeriodo("MENSUAL", date("Y-m-d"));
-    $label = str_replace("Mensual", "Individual", $label);
-  }
+  $label = $esIndividual ? "Individual ($desde al $hasta)" : "Rango ($desde al $hasta)";
 } else {
-  [$desde, $hasta, $label] = rangeFromPeriodo($periodo, $fechaBase);
+  [$desde, $hasta, $label] = rangeFromPeriodo(
+    $esIndividual ? 'MENSUAL' : $periodo,
+    $esIndividual ? date('Y-m-d') : $fechaBase
+  );
+  if ($esIndividual) $label = str_replace('Mensual', 'Individual', $label);
+}
+if (!fechaPdfValida($desde) || !fechaPdfValida($hasta) || $hasta < $desde) {
+  reportePdfDenegar('Rango de fechas invalido.');
+}
+$diasRango = (new DateTimeImmutable($desde))->diff(new DateTimeImmutable($hasta))->days + 1;
+if ($diasRango > 100) {
+  reportePdfDenegar('El reporte admite un maximo de 100 dias por solicitud.');
 }
 
 $turnoId = ($turnoIdRaw === "") ? null : (int)$turnoIdRaw;
@@ -309,7 +334,7 @@ $dates = dateListInclusive($desde, $hasta);
 // Busca solo el empleado solicitado para reporte individual.
 if ($esIndividual) {
   $sqlEmp = "
-    SELECT e.id, e.cedula, e.nombres, e.apellidos, e.estado,
+    SELECT e.id, e.cedula, e.nombres, e.apellidos, e.estado, e.creado_en, e.fecha_baja,
            c.nombre AS cargo,
            t.nombre AS turno
     FROM empleados e
@@ -321,17 +346,18 @@ if ($esIndividual) {
   $stmt->execute([$empleadoId]);
   $empleados = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } else {
-  // Reporte general de empleados activos.
+  // Incluir personal historico durante su periodo de vinculacion.
   $sqlEmp = "
-    SELECT e.id, e.cedula, e.nombres, e.apellidos, e.estado,
+    SELECT e.id, e.cedula, e.nombres, e.apellidos, e.estado, e.creado_en, e.fecha_baja,
            c.nombre AS cargo,
            t.nombre AS turno
     FROM empleados e
     JOIN cargos c ON c.id = e.cargo_id
     LEFT JOIN turnos t ON t.id = e.turno_id
-    WHERE e.estado='ACTIVO'
+    WHERE e.creado_en < DATE_ADD(?, INTERVAL 1 DAY)
+      AND (e.fecha_baja IS NULL OR e.fecha_baja >= ?)
   ";
-  $paramsEmp = [];
+  $paramsEmp = [$hasta, $desde];
 
   if ($turnoId !== null) {
     $sqlEmp .= " AND e.turno_id = ? ";
@@ -360,7 +386,7 @@ if (!$empleados) {
   $pdf->AddPage();
 reportePdfAgregarCintillo($pdf);
   $pdf->SetFont("helvetica", "", 12);
-  $pdf->Write(0, "No hay empleados activos para el filtro seleccionado.", "", 0, "L", true, 0, false, false, 0);
+  $pdf->Write(0, "No hay empleados en el periodo seleccionado.", "", 0, "L", true, 0, false, false, 0);
   $pdf->Output("reporte.pdf", "I");
   exit;
 }
@@ -384,7 +410,7 @@ $asisRows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $sqlPerm = "
   SELECT empleado_id, fecha_inicio, fecha_fin, tipo, motivo
   FROM permisos
-  WHERE estado='ACTIVO'
+  WHERE estado IN ('ACTIVO','CERRADO')
     AND fecha_fin >= ?
     AND fecha_inicio <= ?
     AND empleado_id IN ($placeholders)
@@ -397,7 +423,7 @@ $permRows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $sqlRepo = "
   SELECT empleado_id, fecha_inicio, fecha_fin, tipo, motivo
   FROM reposos
-  WHERE estado='ACTIVO'
+  WHERE estado IN ('ACTIVO','CERRADO')
     AND fecha_fin >= ?
     AND fecha_inicio <= ?
     AND empleado_id IN ($placeholders)
@@ -406,15 +432,45 @@ $stmt = $pdo->prepare($sqlRepo);
 $stmt->execute(array_merge([$desde, $hasta], $empIds));
 $repoRows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+// Reproducir el estado laboral segun su historial, sin usar solo el estado actual.
+$historialPorEmpleado = [];
+$stmtHist = $pdo->prepare("SELECT empleado_id, estado_anterior, estado_nuevo, creado_en
+  FROM empleados_historial_estado
+  WHERE empleado_id IN ($placeholders)
+  ORDER BY empleado_id, creado_en, id");
+$stmtHist->execute($empIds);
+foreach ($stmtHist->fetchAll(PDO::FETCH_ASSOC) as $mov) {
+  $historialPorEmpleado[(int)$mov['empleado_id']][] = $mov;
+}
+$empleadosPorId = [];
+foreach ($empleados as $emp) $empleadosPorId[(int)$emp['id']] = $emp;
+
 $statusMap = [];
 foreach ($empIds as $id) {
+  $emp = $empleadosPorId[$id];
+  $eventos = $historialPorEmpleado[$id] ?? [];
+  $estadoInicial = $eventos
+    ? strtoupper((string)$eventos[0]['estado_anterior'])
+    : strtoupper((string)$emp['estado']);
   $statusMap[$id] = [];
   foreach ($dates as $d) {
-    $statusMap[$id][$d] = [
-      'estado' => 'AUSENTE',
-      'detalle' => 'Sin justificaciÓn',
-      'minutos_tarde' => 0
-    ];
+    $estadoDia = $estadoInicial;
+    foreach ($eventos as $evento) {
+      if (substr((string)$evento['creado_en'], 0, 10) > $d) break;
+      $estadoDia = strtoupper((string)$evento['estado_nuevo']);
+    }
+    if (!$eventos && strtoupper((string)$emp['estado']) === 'RETIRADO'
+        && !empty($emp['fecha_baja']) && $d <= $emp['fecha_baja']) {
+      $estadoDia = 'ACTIVO';
+    }
+    $statusMap[$id][$d] = estadoBaseReporte($d, date('Y-m-d'));
+    if ($d < substr((string)$emp['creado_en'], 0, 10) || $estadoDia !== 'ACTIVO') {
+      $statusMap[$id][$d] = [
+        'estado' => 'NO_LABORABLE',
+        'detalle' => $estadoDia !== 'ACTIVO' ? 'Sin jornada por estado ' . $estadoDia : 'Aun no registrado',
+        'minutos_tarde' => 0
+      ];
+    }
   }
 }
 
@@ -522,6 +578,7 @@ $sumGlobal = [
   'permiso' => 0,
   'reposo' => 0,
   'ausente' => 0,
+  'sin_obligacion' => 0,
   'asistio' => 0,
 ];
 
@@ -539,6 +596,7 @@ foreach ($empleados as $emp) {
     'permiso' => 0,
     'reposo' => 0,
     'ausente' => 0,
+    'sin_obligacion' => 0,
     'asistio' => 0,
   ];
 
@@ -553,7 +611,9 @@ foreach ($empleados as $emp) {
       $cnt["permiso"]++;
     } elseif ($st === "REPOSO") {
       $cnt["reposo"]++;
-    } else {
+    } elseif ($st === "NO_LABORABLE" || $st === "PENDIENTE") {
+      $cnt["sin_obligacion"]++;
+    } elseif ($st === "AUSENTE") {
       $cnt["ausente"]++;
     }
 
@@ -564,7 +624,7 @@ foreach ($empleados as $emp) {
     $cnt['asistio'] = $cnt['a_tiempo'] + $cnt['retardo'];
 
     // detalle: guardar todo lo que NO sea "a tiempo"
-    if ($st !== 'A_TIEMPO') {
+    if (!in_array($st, ['A_TIEMPO', 'NO_LABORABLE', 'PENDIENTE'], true)) {
       $incidencias[] = [
         'fecha' => $d,
         'cedula' => $emp["cedula"],
@@ -588,6 +648,7 @@ foreach ($empleados as $emp) {
     'permiso' => $cnt['permiso'],
     'reposo' => $cnt['reposo'],
     'ausente' => $cnt['ausente'],
+    'sin_obligacion' => $cnt['sin_obligacion'],
   ];
 
   $sumGlobal['a_tiempo'] += $cnt['a_tiempo'];
@@ -596,6 +657,7 @@ foreach ($empleados as $emp) {
   $sumGlobal['permiso']  += $cnt['permiso'];
   $sumGlobal['reposo']   += $cnt['reposo'];
   $sumGlobal['ausente']  += $cnt['ausente'];
+  $sumGlobal['sin_obligacion'] += $cnt['sin_obligacion'];
 }
 
 $sumGlobal['asistio'] = $sumGlobal['a_tiempo'] + $sumGlobal['retardo'];
@@ -658,13 +720,14 @@ $html = '
   Generado: '.$generado.'<br>
   Rango: <strong>'.$desde.'</strong> al <strong>'.$hasta.'</strong><br>
   Turno: '.$turnoTxt.'<br>
-  Empleados: <strong>'.$sumGlobal["empleados"].'</strong> | Días en rango: <strong>'.$sumGlobal["dias"].'</strong>
+  Empleados: <strong>'.$sumGlobal["empleados"].'</strong> | Días en rango: <strong>'.$sumGlobal["dias"].'</strong><br>
+  Ausencias solo en días laborables transcurridos; fines de semana y días futuros no cuentan como faltas.
 </div>
 
 <div class="box">
   <table>
     <tr>
-      <th>Total AsistiÓ</th><th>A tiempo</th><th>Retardos</th><th>Salidas tardías</th><th>Permisos</th><th>Reposos</th><th>Ausencias</th>
+      <th>Total AsistiÓ</th><th>A tiempo</th><th>Retardos</th><th>Salidas tardías</th><th>Permisos</th><th>Reposos</th><th>Ausencias</th><th>Sin jornada / futuro</th>
     </tr>
     <tr>
       <td>'.$sumGlobal["asistio"].'</td>
@@ -674,6 +737,7 @@ $html = '
       <td>'.$sumGlobal["permiso"].'</td>
       <td>'.$sumGlobal["reposo"].'</td>
       <td>'.$sumGlobal["ausente"].'</td>
+      <td>'.$sumGlobal["sin_obligacion"].'</td>
     </tr>
   </table>
 </div>
@@ -702,7 +766,7 @@ if ($esIndividual && count($empleados) > 0) {
     $html .= '<div class="box">
       <table>
         <tr>
-          <th>Total AsistiÓ</th><th>A tiempo</th><th>Retardos</th><th>Salidas tardías</th><th>Permisos</th><th>Reposos</th><th>Ausencias</th>
+          <th>Total AsistiÓ</th><th>A tiempo</th><th>Retardos</th><th>Salidas tardías</th><th>Permisos</th><th>Reposos</th><th>Ausencias</th><th>Sin jornada / futuro</th>
         </tr>
         <tr>
           <td>'.$r["asistio"].'</td>
@@ -712,6 +776,7 @@ if ($esIndividual && count($empleados) > 0) {
           <td>'.$r["permiso"].'</td>
           <td>'.$r["reposo"].'</td>
           <td>'.$r["ausente"].'</td>
+      <td>'.$r["sin_obligacion"].'</td>
         </tr>
       </table>
     </div>';
@@ -722,7 +787,7 @@ if ($esIndividual && count($empleados) > 0) {
 <table>
   <tr>
     <th>Cédula</th><th>Empleado</th><th>Turno</th>
-    <th>AsistiÓ</th><th>A tiempo</th><th>Tarde</th><th>Salida tardía</th><th>Permiso</th><th>Reposo</th><th>Ausente</th>
+    <th>AsistiÓ</th><th>A tiempo</th><th>Tarde</th><th>Salida tardía</th><th>Permiso</th><th>Reposo</th><th>Ausente</th><th>Sin jornada / futuro</th>
   </tr>';
 
   foreach ($resumen as $r) {
@@ -737,6 +802,7 @@ if ($esIndividual && count($empleados) > 0) {
       <td>'.$r["permiso"].'</td>
       <td>'.$r["reposo"].'</td>
       <td>'.$r["ausente"].'</td>
+      <td>'.$r["sin_obligacion"].'</td>
     </tr>';
   }
 

@@ -2,6 +2,7 @@
 require_once __DIR__ . "/../includes/config.php";
 require_once __DIR__ . "/../includes/funciones.php";
 require_once __DIR__ . "/../includes/conexion.php";
+require_once __DIR__ . "/../includes/auditoria.php";
 
 requireLogin();
 
@@ -51,7 +52,7 @@ try {
   $pdo->beginTransaction();
 
   // Buscar empleado
-  $stmt = $pdo->prepare("SELECT id, estado FROM empleados WHERE id=? LIMIT 1");
+  $stmt = $pdo->prepare("SELECT id, estado FROM empleados WHERE id=? LIMIT 1 FOR UPDATE");
   $stmt->execute([$id]);
   $emp = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -65,21 +66,43 @@ try {
   if ($accion === "suspender") $nuevo = "SUSPENDIDO";
   if ($accion === "retirar")   $nuevo = "RETIRADO";
 
+  $estadoAnterior = strtoupper(trim((string)$emp['estado']));
+  if ($estadoAnterior === $nuevo) {
+    $pdo->rollBack();
+    header("Location: " . BASE_URL . "/modulos/personal.php?msg=" . urlencode("El empleado ya tiene ese estado."));
+    exit;
+  }
+
   if ($accion === "retirar") {
     $upd = $pdo->prepare("UPDATE empleados SET estado=?, condicion_baja=?, fecha_baja=CURDATE() WHERE id=?");
     $upd->execute([$nuevo, $condicion !== "" ? $condicion : null, $id]);
 
-    // Anula permisos y reposos activos al retirar el empleado.
-    $pdo->prepare("UPDATE permisos SET estado='ANULADO' WHERE empleado_id=? AND estado='ACTIVO'")
-        ->execute([$id]);
-
-    $pdo->prepare("UPDATE reposos SET estado='ANULADO' WHERE empleado_id=? AND estado='ACTIVO'")
-        ->execute([$id]);
+    // Conservar historicos cumplidos, cerrar periodos en curso y anular solo futuros.
+    foreach (['permisos', 'reposos'] as $tabla) {
+      $pdo->prepare("UPDATE {$tabla} SET estado='CERRADO'
+        WHERE empleado_id=? AND estado='ACTIVO' AND fecha_fin < CURDATE()")
+          ->execute([$id]);
+      $pdo->prepare("UPDATE {$tabla}
+        SET fecha_fin=DATE_SUB(CURDATE(), INTERVAL 1 DAY), estado='CERRADO'
+        WHERE empleado_id=? AND estado='ACTIVO'
+          AND fecha_inicio < CURDATE() AND fecha_fin >= CURDATE()")
+          ->execute([$id]);
+      $pdo->prepare("UPDATE {$tabla} SET estado='ANULADO'
+        WHERE empleado_id=? AND estado='ACTIVO' AND fecha_inicio >= CURDATE()")
+          ->execute([$id]);
+    }
   } else {
     $upd = $pdo->prepare("UPDATE empleados SET estado=?, condicion_baja=NULL, fecha_baja=NULL WHERE id=?");
     $upd->execute([$nuevo, $id]);
   }
 
+  // El registro de historial y la auditoria se confirman junto al cambio de estado.
+  $actorId = (int)($_SESSION['user']['id'] ?? $_SESSION['usuario_id'] ?? 0);
+  $logEstado = $pdo->prepare('INSERT INTO empleados_historial_estado (empleado_id, estado_anterior, estado_nuevo, condicion_baja, actor_id) VALUES (?, ?, ?, ?, ?)');
+  $logEstado->execute([$id, $estadoAnterior, $nuevo, $accion === 'retirar' && $condicion !== '' ? $condicion : null, $actorId > 0 ? $actorId : null]);
+  registrarAuditoria($pdo, 'CAMBIAR_ESTADO', 'empleados', $id, [
+    'anterior' => $estadoAnterior, 'nuevo' => $nuevo
+  ]);
   $pdo->commit();
 
   $msg = "Estado actualizado a $nuevo";

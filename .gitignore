@@ -108,3 +108,7 @@ docs/LIMPIEZA_FINAL_*/
 # Archivos internos no entregar
 backups/
 docs/LIMPIEZA_FINAL_*/
+
+# Justificativos privados (H-06)
+uploads/justificativos/*
+!uploads/justificativos/.htaccess

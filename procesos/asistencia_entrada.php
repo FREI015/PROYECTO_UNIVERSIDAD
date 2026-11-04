@@ -160,7 +160,9 @@ if ($tieneVentanaTurno && !$esExcepcionAdmin) {
     $fecha_asistencia,
     $now,
     $tz,
-    (string)$tipoTurno
+    (string)$tipoTurno,
+    (string)$horaInicio,
+    $horaFin !== null ? (string)$horaFin : null
   );
 
   if (!$ventanaEntrada["ok"]) {

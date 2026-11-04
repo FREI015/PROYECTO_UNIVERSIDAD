@@ -130,7 +130,7 @@ No deben versionarse:
 - uploads de usuarios;
 - backups locales.
 
-El detalle por archivo de cada cambio esta en CAMBIOS.md.
+El detalle de los cambios se puede consultar en este documento y en el historial de Git.
 
 
 

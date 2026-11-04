@@ -131,6 +131,8 @@ try {
     );
   }
 
+  require_once __DIR__ . '/../includes/auditoria.php';
+  registrarAuditoria($pdo, 'RESTABLECER_ACCESO', 'usuarios', $id, []);
   $pdo->commit();
 
 } catch (Throwable $e) {

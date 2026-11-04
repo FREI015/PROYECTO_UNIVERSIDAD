@@ -310,7 +310,7 @@ function personalFotoSegura($foto): string {
         return "";
     }
 
-    return rtrim(BASE_URL, "/") . "/" . ltrim($foto, "/");
+    return fotoEmpleadoUrl($foto);
 }
 
 $pageTitle = "Personal del Plantel";
@@ -1007,7 +1007,127 @@ table th{
 
     </div>
 
-    <div class="card table-card">
+    <?php if (esRolGlobal()): ?>
+<details class="card" id="configurar-cargos-turnos"
+    <?php echo isset($_GET['catalogos']) ? 'open' : ''; ?>
+    style="margin:16px 0;padding:18px">
+
+<summary style="font-weight:700;cursor:pointer;font-size:18px">
+    Configurar cargos y turnos
+</summary>
+
+<?php
+$catalogosMsg = isset($_GET['cat_msg']) && is_string($_GET['cat_msg'])
+    ? substr($_GET['cat_msg'], 0, 200) : '';
+
+$catalogosErr = isset($_GET['cat_err']) && is_string($_GET['cat_err'])
+    ? substr($_GET['cat_err'], 0, 200) : '';
+
+$cargosConfig = $pdo->query("
+    SELECT c.id, c.nombre, c.descripcion, COUNT(e.id) AS empleados
+    FROM cargos c
+    LEFT JOIN empleados e ON e.cargo_id = c.id
+    GROUP BY c.id, c.nombre, c.descripcion
+    ORDER BY c.nombre
+")->fetchAll(PDO::FETCH_ASSOC);
+
+$turnosConfig = $pdo->query("
+    SELECT t.id, t.nombre, t.hora_inicio, t.hora_fin,
+           COUNT(e.id) AS empleados
+    FROM turnos t
+    LEFT JOIN empleados e ON e.turno_id = t.id
+    GROUP BY t.id, t.nombre, t.hora_inicio, t.hora_fin
+    ORDER BY t.id
+")->fetchAll(PDO::FETCH_ASSOC);
+?>
+<style>
+.catalogos-wrap{max-width:1100px;margin:0 auto}
+.catalogos-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start}
+.catalogos-box{background:white;border:1px solid #e9edf4;border-radius:14px;padding:18px;margin-top:16px}
+.catalogos-box h2{margin-bottom:14px;font-size:20px}
+.catalogos-form{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:10px 0;border-top:1px solid #eee}
+.catalogos-form:first-of-type{border-top:0}
+.catalogos-form input{min-width:100px;flex:1;padding:9px;border:1px solid #ccd4df;border-radius:8px}
+.catalogos-form button{border:0;border-radius:8px;background:#0b6efd;color:white;padding:10px;cursor:pointer}
+.catalogos-form button.danger{background:#b91c1c}
+.catalogos-hint{color:#566070;font-size:13px;margin:6px 0 12px}
+.catalogos-msg{padding:12px;border-radius:9px;margin-top:12px;background:#e8f8ee}
+.catalogos-msg.err{background:#ffebeb}
+@media(max-width:830px){.catalogos-grid{grid-template-columns:1fr}}
+</style>
+<div class="catalogos-wrap">
+
+  <p class="catalogos-hint">Administracion exclusiva de Directora y Subdirector. No se modifican ni eliminan catalogos que tengan empleados asignados.</p>
+  <?php if ($catalogosMsg !== ''): ?><div class="catalogos-msg"><?php echo e($catalogosMsg); ?></div><?php endif; ?>
+  <?php if ($catalogosErr !== ''): ?><div class="catalogos-msg err"><?php echo e($catalogosErr); ?></div><?php endif; ?>
+  <div class="catalogos-grid">
+    <section class="catalogos-box">
+      <h2>Cargos</h2>
+      <form class="catalogos-form" method="post" action="<?php echo e(BASE_URL); ?>/procesos/catalogos_guardar.php">
+        <?php echo csrfInput(); ?>
+        <input type="hidden" name="accion" value="guardar_cargo">
+        <input name="nombre" maxlength="80" placeholder="Nuevo cargo" aria-label="Nuevo cargo" required>
+        <input name="descripcion" maxlength="200" placeholder="Descripcion (opcional)" aria-label="Descripcion">
+        <button type="submit">Crear</button>
+      </form>
+      <?php foreach ($cargosConfig as $cargo): ?>
+        <form class="catalogos-form" method="post" action="<?php echo e(BASE_URL); ?>/procesos/catalogos_guardar.php">
+          <?php echo csrfInput(); ?>
+          <input type="hidden" name="accion" value="guardar_cargo">
+          <input type="hidden" name="id" value="<?php echo (int)$cargo['id']; ?>">
+          <input name="nombre" maxlength="80" value="<?php echo e($cargo['nombre']); ?>" required>
+          <input name="descripcion" maxlength="200" value="<?php echo e($cargo['descripcion'] ?? ''); ?>" placeholder="Descripcion">
+          <button type="submit">Guardar</button>
+        </form>
+        <p class="catalogos-hint"><?php echo (int)$cargo['empleados']; ?> empleados asignados</p>
+        <?php if ((int)$cargo['empleados'] === 0): ?>
+          <form class="catalogos-form" method="post" action="<?php echo e(BASE_URL); ?>/procesos/catalogos_guardar.php" onsubmit="return confirm('Eliminar este cargo?');">
+            <?php echo csrfInput(); ?>
+            <input type="hidden" name="accion" value="eliminar_cargo">
+            <input type="hidden" name="id" value="<?php echo (int)$cargo['id']; ?>">
+            <button class="danger" type="submit">Eliminar cargo</button>
+          </form>
+        <?php endif; ?>
+      <?php endforeach; ?>
+    </section>
+    <section class="catalogos-box">
+      <h2>Turnos</h2>
+      <p class="catalogos-hint">Los turnos MATUTINO y VESPERTINO se utilizan para limitar el acceso de los roles DIURNO y TARDE.</p>
+      <form class="catalogos-form" method="post" action="<?php echo e(BASE_URL); ?>/procesos/catalogos_guardar.php">
+        <?php echo csrfInput(); ?>
+        <input type="hidden" name="accion" value="guardar_turno">
+        <input name="nombre" maxlength="50" placeholder="Nuevo turno" required>
+        <input type="time" name="hora_inicio" required aria-label="Hora inicio">
+        <input type="time" name="hora_fin" required aria-label="Hora fin">
+        <button type="submit">Crear</button>
+      </form>
+      <?php foreach ($turnosConfig as $turno): ?>
+        <form class="catalogos-form" method="post" action="<?php echo e(BASE_URL); ?>/procesos/catalogos_guardar.php">
+          <?php echo csrfInput(); ?>
+          <input type="hidden" name="accion" value="guardar_turno">
+          <input type="hidden" name="id" value="<?php echo (int)$turno['id']; ?>">
+          <input name="nombre" maxlength="50" value="<?php echo e($turno['nombre']); ?>" required>
+          <input type="time" name="hora_inicio" value="<?php echo e(substr((string)$turno['hora_inicio'], 0, 5)); ?>" required>
+          <input type="time" name="hora_fin" value="<?php echo e(substr((string)$turno['hora_fin'], 0, 5)); ?>" required>
+          <button type="submit">Guardar</button>
+        </form>
+        <p class="catalogos-hint"><?php echo (int)$turno['empleados']; ?> empleados asignados</p>
+        <?php if ((int)$turno['empleados'] === 0 && !in_array(strtoupper($turno['nombre']), ['MATUTINO','VESPERTINO','COMPLETO'], true)): ?>
+          <form class="catalogos-form" method="post" action="<?php echo e(BASE_URL); ?>/procesos/catalogos_guardar.php" onsubmit="return confirm('Eliminar este turno?');">
+            <?php echo csrfInput(); ?>
+            <input type="hidden" name="accion" value="eliminar_turno">
+            <input type="hidden" name="id" value="<?php echo (int)$turno['id']; ?>">
+            <button class="danger" type="submit">Eliminar turno</button>
+          </form>
+        <?php endif; ?>
+      <?php endforeach; ?>
+    </section>
+  </div>
+</div>
+
+</details>
+<?php endif; ?>
+<div class="card table-card">
 
         <div class="table-title">Listado de Personal</div>
 
@@ -1232,12 +1352,13 @@ table th{
                                         data-cargo-id="<?php echo (int)($p["cargo_id"] ?? 0); ?>"
                                         data-turno-id="<?php echo (int)($p["turno_id"] ?? 0); ?>"
                                         data-codigo="<?php echo e($p["codigo_barra"] ?? ""); ?>"
-                                        data-foto="<?php echo e($p["foto_archivo"] ?? ""); ?>"
+                                        data-foto="<?php echo e(fotoEmpleadoUrl($p["foto_archivo"] ?? "")); ?>"
                                     >
                                         Editar
                                     </button>
 
                                 <?php endif; ?>
+                                <a class="btn-action" href="<?php echo e(BASE_URL); ?>/modulos/historial_personal.php?empleado_id=<?php echo (int)$p['id']; ?>">Historial</a>
 
                             </td>
                         </tr>
@@ -1773,13 +1894,10 @@ table th{
 
             const ruta = boton.dataset.foto || '';
 
-            const segura =
-                /^[a-zA-Z0-9_./-]+\.(?:jpe?g|png|webp)$/i.test(ruta) &&
+            const segura = ruta.startsWith(baseUrl + '/procesos/foto_empleado.php?archivo=') &&
                 !ruta.includes('..');
 
-            preview.src = segura
-                ? baseUrl + '/' + ruta.replace(/^\/+/, '')
-                : '';
+            preview.src = segura ? ruta : '';
 
             preview.style.display = segura ? 'block' : 'none';
         }

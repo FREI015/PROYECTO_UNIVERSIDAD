@@ -276,7 +276,8 @@ if (
         );
 
         $okFotoUrl = fotoEmpleadoUrl(
-          $okEmpleado["foto_archivo"] ?? null
+          $okEmpleado["foto_archivo"] ?? null,
+          true
         );
 
         $okInicial = strtoupper(

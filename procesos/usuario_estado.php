@@ -47,8 +47,18 @@ if ($estadoActual === $nuevoEstado) {
   go(BASE_URL . "/modulos/usuarios.php?msg=" . urlencode("El usuario ya tiene ese estado."));
 }
 
-$stmt = $pdo->prepare("UPDATE usuarios SET estado = ? WHERE id = ?");
-$stmt->execute([$nuevoEstado, $id]);
+require_once __DIR__ . '/../includes/auditoria.php';
+try {
+  $pdo->beginTransaction();
+  $stmt = $pdo->prepare("UPDATE usuarios SET estado = ? WHERE id = ?");
+  $stmt->execute([$nuevoEstado, $id]);
+  registrarAuditoria($pdo, 'CAMBIAR_ESTADO_USUARIO', 'usuarios', $id, ['anterior' => $estadoActual, 'nuevo' => $nuevoEstado]);
+  $pdo->commit();
+} catch (Throwable $e) {
+  if ($pdo->inTransaction()) $pdo->rollBack();
+  error_log('Estado usuario: ' . $e->getMessage());
+  go(BASE_URL . '/modulos/usuarios.php?err=' . urlencode('No se pudo guardar el estado. Comprueba las migraciones.'));
+}
 
 $mensaje = $nuevoEstado === "ACTIVO" ? "Usuario activado correctamente." : "Usuario inactivado correctamente.";
 

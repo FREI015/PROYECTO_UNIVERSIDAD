@@ -782,6 +782,71 @@ require_once __DIR__ . "/../includes/header.php";
   }
 })();
 </script>
+<?php if (esRolGlobal()): ?>
+<div class="usuarios-wrap" id="historial-actividad" style="margin-top:16px">
+
+  <details class="card usuarios-card"
+    <?php echo isset($_GET['ver_actividad']) ? 'open' : ''; ?>>
+
+    <summary style="font-size:17px;font-weight:800;cursor:pointer">
+      Ver historial de actividad administrativa
+    </summary>
+
+    <p class="usuarios-sub" style="margin:12px 0">
+      Últimos 200 cambios registrados.
+      Solo disponible para Directora y Subdirector.
+    </p>
+
+    <?php
+      $auditoriaRegistros = $pdo->query(
+        'SELECT a.id, a.creado_en, u.usuario,
+                a.accion, a.entidad, a.entidad_id, a.detalle
+         FROM auditoria_acciones a
+         LEFT JOIN usuarios u ON u.id = a.actor_id
+         ORDER BY a.id DESC LIMIT 200'
+      )->fetchAll(PDO::FETCH_ASSOC);
+    ?>
+
+    <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Usuario</th>
+            <th>Acción</th>
+            <th>Entidad</th>
+            <th>ID</th>
+            <th>Detalle</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <?php if (!$auditoriaRegistros): ?>
+            <tr>
+              <td colspan="6">
+                Todavía no hay acciones registradas.
+              </td>
+            </tr>
+          <?php endif; ?>
+
+          <?php foreach ($auditoriaRegistros as $registro): ?>
+            <tr>
+              <td><?php echo e((string)$registro['creado_en']); ?></td>
+              <td><?php echo e((string)($registro['usuario'] ?: 'Sistema')); ?></td>
+              <td><?php echo e((string)$registro['accion']); ?></td>
+              <td><?php echo e((string)$registro['entidad']); ?></td>
+              <td><?php echo $registro['entidad_id'] === null ? '—' : (int)$registro['entidad_id']; ?></td>
+              <td><?php echo e((string)$registro['detalle']); ?></td>
+            </tr>
+          <?php endforeach; ?>
+
+        </tbody>
+      </table>
+    </div>
+
+  </details>
+</div>
+<?php endif; ?>
 <?php require_once __DIR__ . "/../includes/footer.php"; ?>
 
 

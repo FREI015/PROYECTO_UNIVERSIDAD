@@ -259,6 +259,8 @@ require_once __DIR__ . '/cintillo_institucional.php';
         <a class="<?php echo $active==='personal'?'active':''; ?>" href="<?php echo e(BASE_URL); ?>/modulos/personal.php">Personal</a>
       <?php endif; ?>
 
+      <?php if (esRolGlobal()): ?>
+      <?php endif; ?>
       <?php if (usuarioPuedeAccederModuloUsuarios()): ?>
         <a class="<?php echo $active==='usuarios'?'active':''; ?>" href="<?php echo e(BASE_URL); ?>/modulos/usuarios.php">Usuarios</a>
       <?php endif; ?>

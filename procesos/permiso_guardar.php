@@ -82,11 +82,41 @@ if (strtoupper($emp["estado"]) !== "ACTIVO") {
 $creado_por = (int)($_SESSION["user"]["id"] ?? $_SESSION["usuario_id"] ?? 0);
 $creado_por = $creado_por > 0 ? $creado_por : null;
 
-$ins = $pdo->prepare("
-  INSERT INTO permisos (empleado_id, tipo, fecha_inicio, fecha_fin, motivo, observaciones, estado, creado_por, creado_en)
-  VALUES (?, ?, ?, ?, ?, ?, 'ACTIVO', ?, NOW())
-");
-$ins->execute([$empleado_id, $tipo, $fecha_inicio, $fecha_fin, $motivo, $observaciones, $creado_por]);
+require_once __DIR__ . '/../includes/auditoria.php';
+try {
+  $pdo->beginTransaction();
+  // Mismo bloqueo que la creacion de reposos: impide cruces simultaneos.
+  $lock = $pdo->prepare("SELECT estado FROM empleados WHERE id = ? FOR UPDATE");
+  $lock->execute([$empleado_id]);
+  if (strtoupper((string)$lock->fetchColumn()) !== 'ACTIVO') {
+    $pdo->rollBack();
+    header("Location: " . BASE_URL . "/modulos/permisos.php?err=" . urlencode("El empleado no esta activo."));
+    exit;
+  }
+  foreach (['permisos', 'reposos'] as $tabla) {
+    $conflicto = $pdo->prepare("SELECT id FROM {$tabla}
+      WHERE empleado_id = ? AND estado = 'ACTIVO'
+        AND fecha_inicio <= ? AND fecha_fin >= ? LIMIT 1");
+    $conflicto->execute([$empleado_id, $fecha_fin, $fecha_inicio]);
+    if ($conflicto->fetchColumn() !== false) {
+      $pdo->rollBack();
+      header("Location: " . BASE_URL . "/modulos/permisos.php?err=" . urlencode("Ya hay un permiso o reposo activo en esas fechas."));
+      exit;
+    }
+  }
+  $ins = $pdo->prepare("
+    INSERT INTO permisos (empleado_id, tipo, fecha_inicio, fecha_fin, motivo, observaciones, estado, creado_por, creado_en)
+    VALUES (?, ?, ?, ?, ?, ?, 'ACTIVO', ?, NOW())
+  ");
+  $ins->execute([$empleado_id, $tipo, $fecha_inicio, $fecha_fin, $motivo, $observaciones, $creado_por]);
+  registrarAuditoria($pdo, 'CREAR_PERMISO', 'permisos', (int)$pdo->lastInsertId(), ['empleado_id' => $empleado_id]);
+  $pdo->commit();
+} catch (Throwable $e) {
+  if ($pdo->inTransaction()) $pdo->rollBack();
+  error_log('Permiso guardar: ' . $e->getMessage());
+  header('Location: ' . BASE_URL . '/modulos/permisos.php?err=' . urlencode('No se pudo registrar el permiso. Comprueba las migraciones.'));
+  exit;
+}
 
 header("Location: " . BASE_URL . "/modulos/permisos.php?msg=" . urlencode("Permiso guardado"));
 exit;

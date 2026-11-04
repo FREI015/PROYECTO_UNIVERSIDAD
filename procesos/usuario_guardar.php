@@ -77,7 +77,17 @@ $stmt = $pdo->prepare("
 VALUES (?, ?, ?, ?, 1, NOW())
 ");
 
-$stmt->execute([$usuario, $hash, $rol, $estado]);
+$pdo->beginTransaction();
+try {
+  $stmt->execute([$usuario, $hash, $rol, $estado]);
+  require_once __DIR__ . '/../includes/auditoria.php';
+  registrarAuditoria($pdo, 'CREAR_USUARIO', 'usuarios', (int)$pdo->lastInsertId(), ['rol' => $rol, 'estado' => $estado]);
+  $pdo->commit();
+} catch (Throwable $e) {
+  if ($pdo->inTransaction()) $pdo->rollBack();
+  error_log('Crear usuario: ' . $e->getMessage());
+  go(BASE_URL . '/modulos/usuarios.php?err=' . urlencode('No se pudo crear el usuario. Comprueba las migraciones.'));
+}
 
 go(BASE_URL . "/modulos/usuarios.php?msg=" . urlencode("Usuario creado correctamente."));
 
