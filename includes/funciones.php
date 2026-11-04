@@ -1599,6 +1599,15 @@ function esSegundoTurno(?string $turnoNombre, ?int $turnoId = null): bool {
   );
 }
 
+function esTurnoCompleto(?string $turnoNombre, ?int $turnoId = null): bool {
+  return turnoCoincideConfigurado(
+    $turnoNombre,
+    $turnoId,
+    "TURNO_COMPLETO_ID",
+    "TURNO_COMPLETO_NOMBRE"
+  );
+}
+
 /**
  * Devuelve PRIMER, SEGUNDO, COMPLETO o null segun el turno asignado.
  * Los tres turnos institucionales aplican ventanas de marcaje.
@@ -1615,7 +1624,7 @@ function tipoTurnoVentanas(
     return "SEGUNDO";
   }
 
-  if (strtoupper(trim((string)$turnoNombre)) === "COMPLETO" || (int)$turnoId === 3) {
+  if (esTurnoCompleto($turnoNombre, $turnoId)) {
     return "COMPLETO";
   }
 
@@ -1625,10 +1634,18 @@ function tipoTurnoVentanas(
 function configuracionVentanaTurno(string $tipoTurno): array {
   if ($tipoTurno === "COMPLETO") {
     return [
-      "entrada_desde" => "06:55:00",
-      "entrada_hasta" => "09:00:00",
-      "salida_desde" => "17:00:00",
-      "salida_hasta" => "18:00:00",
+      "entrada_desde" => defined("PRIMER_TURNO_ENTRADA_DESDE")
+        ? (string)constant("PRIMER_TURNO_ENTRADA_DESDE")
+        : "06:55:00",
+      "entrada_hasta" => defined("PRIMER_TURNO_ENTRADA_HASTA")
+        ? (string)constant("PRIMER_TURNO_ENTRADA_HASTA")
+        : "09:00:00",
+      "salida_desde" => defined("SEGUNDO_TURNO_SALIDA_DESDE")
+        ? (string)constant("SEGUNDO_TURNO_SALIDA_DESDE")
+        : "17:00:00",
+      "salida_hasta" => defined("SEGUNDO_TURNO_SALIDA_HASTA")
+        ? (string)constant("SEGUNDO_TURNO_SALIDA_HASTA")
+        : "18:00:00",
       "entrada_error" => "Entrada fuera del horario permitido del turno completo.",
       "salida_error" => "Salida fuera del horario permitido del turno completo.",
     ];
