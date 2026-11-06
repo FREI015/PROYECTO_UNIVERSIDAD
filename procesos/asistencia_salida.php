@@ -7,7 +7,10 @@ require_once __DIR__ . "/../includes/conexion.php";
 $returnQuery = trim((string)($_POST["return_query"] ?? ""));
 
 function asistenciaReturnUrl(string $key, string $message, array $extra = []): string {
-  global $returnQuery;
+  global $returnQuery, $pdo;
+  if ($key === 'err' && $pdo instanceof PDO && $pdo->inTransaction()) {
+    $pdo->rollBack();
+  }
 
   $params = [];
 
@@ -56,12 +59,13 @@ $now = new DateTimeImmutable("now", $tz);
 $hoy_real = $now->format("Y-m-d");
 $hora_now = $now->format("H:i:s");
 
+$pdo->beginTransaction();
 $stmt = $pdo->prepare("
   SELECT e.estado, e.turno_id, t.nombre AS turno_nombre, t.hora_inicio, t.hora_fin
   FROM empleados e
   LEFT JOIN turnos t ON t.id = e.turno_id
   WHERE e.id = ?
-  LIMIT 1
+  LIMIT 1 FOR UPDATE
 ");
 $stmt->execute([$empleado_id]);
 $emp = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -87,6 +91,10 @@ $tipoTurno = tipoTurnoVentanas(
 );
 
 $tieneVentanaTurno = $tipoTurno !== null;
+if (!$tieneVentanaTurno) {
+  header('Location: ' . asistenciaReturnUrl('err', 'Empleado sin turno valido asignado.'));
+  exit;
+}
 
 $esExcepcionAdmin = false;
 $motivoExcepcion = trim((string)($_POST["motivo_excepcion"] ?? ""));
@@ -123,26 +131,13 @@ if ($horaFin !== null) {
   }
 }
 
-if ($tieneVentanaTurno && !$esExcepcionAdmin) {
-  $ventanaSalida = validarVentanaSalidaTurno(
-    $fecha_asistencia,
-    $now,
-    $tz,
-    (string)$tipoTurno,
-    (string)$horaInicio,
-    $horaFin !== null ? (string)$horaFin : null
-  );
-
-  if (!$ventanaSalida["ok"]) {
-    header("Location: " . asistenciaReturnUrl("err", (string)$ventanaSalida["error"]));
-    exit;
-  }
-}
-
 $stmt = $pdo->prepare("
-  SELECT id, estado, hora_entrada, hora_salida, observacion_sistema
-  FROM asistencias
-  WHERE empleado_id = ? AND fecha = ?
+  SELECT a.id, a.estado, a.hora_entrada, a.hora_salida, a.observacion_sistema,
+    a.turno_id_marcaje, a.hora_inicio_marcaje, a.hora_fin_marcaje,
+    tm.nombre AS turno_marcaje_nombre
+  FROM asistencias a
+  LEFT JOIN turnos tm ON tm.id = a.turno_id_marcaje
+  WHERE a.empleado_id = ? AND a.fecha = ?
   LIMIT 1
 ");
 $stmt->execute([$empleado_id, $fecha_asistencia]);
@@ -162,6 +157,32 @@ if (!empty($row["hora_salida"])) {
     : "Ya tiene salida registrada para esa fecha";
   header("Location: " . asistenciaReturnUrl("err", $mensajeSalidaDuplicada));
   exit;
+}
+
+if (!empty($row['turno_id_marcaje']) && !empty($row['hora_inicio_marcaje']) && !empty($row['hora_fin_marcaje'])) {
+  $horaInicio = (string)$row['hora_inicio_marcaje'];
+  $horaFin = (string)$row['hora_fin_marcaje'];
+  $tipoTurno = tipoTurnoVentanas(
+    (string)($row['turno_marcaje_nombre'] ?? ''),
+    (int)$row['turno_id_marcaje']
+  );
+  $tieneVentanaTurno = $tipoTurno !== null;
+}
+
+if ($tieneVentanaTurno && !$esExcepcionAdmin) {
+  $ventanaSalida = validarVentanaSalidaTurno(
+    $fecha_asistencia,
+    $now,
+    $tz,
+    (string)$tipoTurno,
+    (string)$horaInicio,
+    $horaFin !== null ? (string)$horaFin : null
+  );
+
+  if (!$ventanaSalida["ok"]) {
+    header("Location: " . asistenciaReturnUrl("err", (string)$ventanaSalida["error"]));
+    exit;
+  }
 }
 
 $salidaCalculada = calcularSalidaAsistencia(
@@ -231,6 +252,7 @@ $upd->execute([
   $observacionSistema,
   (int)$row["id"]
 ]);
+$pdo->commit();
 $mensaje = "Salida registrada con éxito";
 
 if ($esExcepcionAdmin) {

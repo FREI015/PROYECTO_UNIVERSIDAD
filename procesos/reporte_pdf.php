@@ -336,7 +336,7 @@ if ($esIndividual) {
   $sqlEmp = "
     SELECT e.id, e.cedula, e.nombres, e.apellidos, e.estado, e.creado_en, e.fecha_baja,
            c.nombre AS cargo,
-           t.nombre AS turno
+           t.nombre AS turno, t.hora_inicio AS hora_inicio_turno
     FROM empleados e
     JOIN cargos c ON c.id = e.cargo_id
     LEFT JOIN turnos t ON t.id = e.turno_id
@@ -350,7 +350,7 @@ if ($esIndividual) {
   $sqlEmp = "
     SELECT e.id, e.cedula, e.nombres, e.apellidos, e.estado, e.creado_en, e.fecha_baja,
            c.nombre AS cargo,
-           t.nombre AS turno
+           t.nombre AS turno, t.hora_inicio AS hora_inicio_turno
     FROM empleados e
     JOIN cargos c ON c.id = e.cargo_id
     LEFT JOIN turnos t ON t.id = e.turno_id
@@ -397,10 +397,15 @@ $placeholders = implode(",", array_fill(0, count($empIds), "?"));
 // 2) Data en bloque
 // asistencias en rango
 $sqlAsis = "
-  SELECT empleado_id, fecha, estado, minutos_tarde, salida_estado, minutos_salida_tardia, observacion_sistema
-  FROM asistencias
-  WHERE fecha BETWEEN ? AND ?
-    AND empleado_id IN ($placeholders)
+  SELECT a.empleado_id, a.fecha, a.estado, a.hora_entrada, a.minutos_tarde, a.salida_estado,
+    a.minutos_salida_tardia, a.observacion_sistema,
+    COALESCE(tm.nombre, tc.nombre) AS turno_historico
+  FROM asistencias a
+  LEFT JOIN turnos tm ON tm.id = a.turno_id_marcaje
+  LEFT JOIN empleados ee ON ee.id = a.empleado_id
+  LEFT JOIN turnos tc ON tc.id = ee.turno_id
+  WHERE a.fecha BETWEEN ? AND ?
+    AND a.empleado_id IN ($placeholders)
 ";
 $stmt = $pdo->prepare($sqlAsis);
 $stmt->execute(array_merge([$desde, $hasta], $empIds));
@@ -463,7 +468,22 @@ foreach ($empIds as $id) {
         && !empty($emp['fecha_baja']) && $d <= $emp['fecha_baja']) {
       $estadoDia = 'ACTIVO';
     }
-    $statusMap[$id][$d] = estadoBaseReporte($d, date('Y-m-d'));
+    $hoyReporte = date('Y-m-d');
+    $statusMap[$id][$d] = estadoBaseReporte($d, $hoyReporte);
+    if ($d === $hoyReporte && $statusMap[$id][$d]['estado'] === 'AUSENTE') {
+      $inicioHoy = trim((string)($emp['hora_inicio_turno'] ?? ''));
+      if (preg_match('/^([01]\d|2[0-3]):[0-5]\d:[0-5]\d$/', $inicioHoy)) {
+        $zonaHora = new DateTimeZone('America/Caracas');
+        $limiteEntradaHoy = (new DateTimeImmutable($d . ' ' . $inicioHoy, $zonaHora))->modify('+121 minutes');
+        if (new DateTimeImmutable('now', $zonaHora) < $limiteEntradaHoy) {
+          $statusMap[$id][$d] = [
+            'estado' => 'PENDIENTE',
+            'detalle' => 'La ventana de entrada sigue abierta',
+            'minutos_tarde' => 0
+          ];
+        }
+      }
+    }
     if ($d < substr((string)$emp['creado_en'], 0, 10) || $estadoDia !== 'ACTIVO') {
       $statusMap[$id][$d] = [
         'estado' => 'NO_LABORABLE',
@@ -524,7 +544,9 @@ foreach ($asisRows as $a) {
   $f = $a["fecha"];
   if (!isset($statusMap[$eid][$f])) continue;
 
-  if ($statusMap[$eid][$f]["estado"] === "REPOSO" || $statusMap[$eid][$f]["estado"] === "PERMISO") {
+  if (($statusMap[$eid][$f]["estado"] === "REPOSO" || $statusMap[$eid][$f]["estado"] === "PERMISO")
+      && empty($a['hora_entrada'])) {
+    // Un reposo/permiso prevalece si no hubo entrada efectiva.
     continue;
   }
 
@@ -535,10 +557,16 @@ foreach ($asisRows as $a) {
   $obsSalida = trim((string)($a["observacion_sistema"] ?? ""));
   $detalleSalida = "";
 
-  if ($salidaEstado === "SALIDA_TARDIA" || $minSalidaTardia > 0) {
-    $detalleSalida = " | Salida tardía" . ($minSalidaTardia > 0 ? " ({$minSalidaTardia} min)" : "");
-  } elseif ($obsSalida !== "" && $salidaEstado !== "NORMAL") {
-    $detalleSalida = " | " . $obsSalida;
+  $esSalidaTardia = $salidaEstado === 'SALIDA_TARDIA';
+  $esSinSalida = $salidaEstado === 'SIN_SALIDA';
+  if ($esSalidaTardia) {
+    $detalleSalida = " | Salida tardia" . ($minSalidaTardia > 0 ? " ({$minSalidaTardia} min)" : "");
+  } elseif ($esSinSalida) {
+    $detalleSalida = ' | Sin salida registrada';
+  } elseif ($salidaEstado === 'SALIDA_ANTICIPADA') {
+    $detalleSalida = ' | Salida anticipada autorizada';
+  } elseif ($obsSalida !== '' && $salidaEstado !== 'NORMAL') {
+    $detalleSalida = ' | ' . $obsSalida;
   }
 
   if ($est === "FALTA") {
@@ -554,16 +582,26 @@ foreach ($asisRows as $a) {
     $statusMap[$eid][$f] = [
       "estado" => "RETARDO",
       "detalle" => "Retardo" . ($minT > 0 ? " ({$minT} min)" : "") . $detalleSalida,
-      "minutos_tarde" => $minT
+      "minutos_tarde" => $minT,
+      "salida_tardia" => $esSalidaTardia,
+      "sin_salida" => $esSinSalida,
+      "salida_anticipada" => ($salidaEstado === 'SALIDA_ANTICIPADA'),
+      "turno_historico" => (string)($a['turno_historico'] ?? '')
     ];
   } else {
-    $estadoDia = $detalleSalida !== "" ? "SALIDA_TARDIA" : "A_TIEMPO";
+    $estadoDia = $esSalidaTardia ? 'SALIDA_TARDIA'
+      : ($esSinSalida ? 'SIN_SALIDA'
+      : ($salidaEstado === 'SALIDA_ANTICIPADA' ? 'SALIDA_ANTICIPADA' : 'A_TIEMPO'));
     $detalleDia = $detalleSalida !== "" ? "AsistiÓ a tiempo" . $detalleSalida : "AsistiÓ a tiempo";
 
     $statusMap[$eid][$f] = [
       "estado" => $estadoDia,
       "detalle" => $detalleDia,
-      "minutos_tarde" => 0
+      "minutos_tarde" => 0,
+      "salida_tardia" => $esSalidaTardia,
+      "sin_salida" => $esSinSalida,
+      "salida_anticipada" => ($salidaEstado === 'SALIDA_ANTICIPADA'),
+      "turno_historico" => (string)($a['turno_historico'] ?? '')
     ];
   }
 }
@@ -603,7 +641,7 @@ foreach ($empleados as $emp) {
   foreach ($dates as $d) {
     $st = $statusMap[$eid][$d]['estado'];
 
-    if ($st === "A_TIEMPO" || $st === "SALIDA_TARDIA") {
+    if (in_array($st, ["A_TIEMPO", "SALIDA_TARDIA", "SIN_SALIDA", "SALIDA_ANTICIPADA"], true)) {
       $cnt["a_tiempo"]++;
     } elseif ($st === "RETARDO") {
       $cnt["retardo"]++;
@@ -617,19 +655,22 @@ foreach ($empleados as $emp) {
       $cnt["ausente"]++;
     }
 
-    if ($st === "SALIDA_TARDIA") {
+    if (!empty($statusMap[$eid][$d]['salida_tardia'])) {
       $cnt["salida_tardia"]++;
     }
 
     $cnt['asistio'] = $cnt['a_tiempo'] + $cnt['retardo'];
 
     // detalle: guardar todo lo que NO sea "a tiempo"
-    if (!in_array($st, ['A_TIEMPO', 'NO_LABORABLE', 'PENDIENTE'], true)) {
+    if (!in_array($st, ['A_TIEMPO', 'NO_LABORABLE', 'PENDIENTE'], true)
+        || !empty($statusMap[$eid][$d]['sin_salida'])
+        || !empty($statusMap[$eid][$d]['salida_tardia'])
+        || !empty($statusMap[$eid][$d]['salida_anticipada'])) {
       $incidencias[] = [
         'fecha' => $d,
         'cedula' => $emp["cedula"],
         'empleado' => $nombre,
-        'turno' => $emp["turno"] ?? "-",
+        'turno' => (string)($statusMap[$eid][$d]['turno_historico'] ?? $emp["turno"] ?? "-"),
         'estado' => $st,
         'detalle' => $statusMap[$eid][$d]['detalle'],
       ];

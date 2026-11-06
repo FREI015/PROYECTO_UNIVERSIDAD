@@ -93,10 +93,11 @@ if (!$empleado) {
 
 $empleado_id = (int)$empleado["id"];
 
+$pdo->beginTransaction();
 $stmt = $pdo->prepare("SELECT e.estado, e.turno_id, t.nombre AS turno_nombre, t.hora_inicio, t.hora_fin
   FROM empleados e
   LEFT JOIN turnos t ON t.id = e.turno_id
-  WHERE e.id = ? LIMIT 1");
+  WHERE e.id = ? LIMIT 1 FOR UPDATE");
 $stmt->execute([$empleado_id]);
 $emp = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -115,6 +116,9 @@ $tipoTurno = tipoTurnoVentanas(
 );
 
 $tieneVentanaTurno = $tipoTurno !== null;
+if (!$tieneVentanaTurno) {
+  barcode_err('Empleado sin turno valido asignado.');
+}
 
 $tz = new DateTimeZone("America/Caracas");
 $now = new DateTimeImmutable("now", $tz);
@@ -133,32 +137,12 @@ if ($horaFin !== null) {
   }
 }
 
-$stmt = $pdo->prepare("SELECT id FROM reposos WHERE empleado_id=? AND estado='ACTIVO' AND ? BETWEEN fecha_inicio AND fecha_fin LIMIT 1");
-$stmt->execute([$empleado_id, $hoy_real]);
-if ($stmt->fetch()) {
-  barcode_err("No puedes marcar: reposo activo");
-}
-
-$stmt = $pdo->prepare("SELECT id FROM permisos WHERE empleado_id=? AND estado='ACTIVO' AND ? BETWEEN fecha_inicio AND fecha_fin LIMIT 1");
-$stmt->execute([$empleado_id, $hoy_real]);
-if ($stmt->fetch()) {
-  barcode_err("No puedes marcar: permiso activo");
-}
-
-$pdo->beginTransaction();
-
-// Bloquea al empleado para evitar marcajes simultaneos.
-$bloqueoEmpleado = $pdo->prepare(
-  "SELECT id FROM empleados WHERE id = ? FOR UPDATE"
-);
-$bloqueoEmpleado->execute([$empleado_id]);
-
-if ($bloqueoEmpleado->fetchColumn() === false) {
-  barcode_err("Empleado no existe");
-}
-
 // Conserva observacion_sistema y la proteccion de concurrencia.
-$stmt = $pdo->prepare("SELECT id, hora_entrada, hora_salida, estado, observacion_sistema FROM asistencias WHERE empleado_id=? AND fecha=? LIMIT 1");
+$stmt = $pdo->prepare("SELECT a.id, a.hora_entrada, a.hora_salida, a.estado, a.observacion_sistema,
+  a.turno_id_marcaje, a.hora_inicio_marcaje, a.hora_fin_marcaje,
+  tm.nombre AS turno_marcaje_nombre
+  FROM asistencias a LEFT JOIN turnos tm ON tm.id = a.turno_id_marcaje
+  WHERE a.empleado_id=? AND a.fecha=? LIMIT 1");
 $stmt->execute([$empleado_id, $fecha_asistencia]);
 $asistencia = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -166,6 +150,15 @@ $uid = (int)($_SESSION["user"]["id"] ?? ($_SESSION["usuario_id"] ?? 0));
 $registrado_por = $uid > 0 ? $uid : null;
 
 if (!$asistencia || empty($asistencia["hora_entrada"])) {
+  // Solo la entrada se bloquea por reposos/permisos; la salida de una
+  // entrada ya registrada debe poder cerrarse sin quedar atrapada.
+  $stmt = $pdo->prepare("SELECT id FROM reposos WHERE empleado_id = ? AND estado = 'ACTIVO' AND ? BETWEEN fecha_inicio AND fecha_fin LIMIT 1");
+  $stmt->execute([$empleado_id, $hoy_real]);
+  if ($stmt->fetchColumn() !== false) barcode_err('No puedes marcar: reposo activo');
+  $stmt = $pdo->prepare("SELECT id FROM permisos WHERE empleado_id = ? AND estado = 'ACTIVO' AND ? BETWEEN fecha_inicio AND fecha_fin LIMIT 1");
+  $stmt->execute([$empleado_id, $hoy_real]);
+  if ($stmt->fetchColumn() !== false) barcode_err('No puedes marcar: permiso activo');
+
   if ($tieneVentanaTurno) {
     $ventanaEntrada = validarVentanaEntradaTurno(
       $fecha_asistencia,
@@ -201,11 +194,11 @@ if (!$asistencia || empty($asistencia["hora_entrada"])) {
   }
 
   if ($asistencia) {
-    $upd = $pdo->prepare("UPDATE asistencias SET hora_entrada=?, estado=?, minutos_tarde=?, registrado_por=? WHERE id=?");
-    $upd->execute([$hora_now, $estado, $min_tarde, $registrado_por, (int)$asistencia["id"]]);
+    $upd = $pdo->prepare("UPDATE asistencias SET hora_entrada=?, estado=?, minutos_tarde=?, registrado_por=?, turno_id_marcaje=?, hora_inicio_marcaje=?, hora_fin_marcaje=? WHERE id=?");
+    $upd->execute([$hora_now, $estado, $min_tarde, $registrado_por, (int)$emp['turno_id'], $horaInicio, $horaFin, (int)$asistencia["id"]]);
   } else {
-    $ins = $pdo->prepare("INSERT INTO asistencias (empleado_id, fecha, estado, hora_entrada, minutos_tarde, registrado_por) VALUES (?, ?, ?, ?, ?, ?)");
-    $ins->execute([$empleado_id, $fecha_asistencia, $estado, $hora_now, $min_tarde, $registrado_por]);
+    $ins = $pdo->prepare("INSERT INTO asistencias (empleado_id, fecha, estado, hora_entrada, minutos_tarde, registrado_por, turno_id_marcaje, hora_inicio_marcaje, hora_fin_marcaje) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    $ins->execute([$empleado_id, $fecha_asistencia, $estado, $hora_now, $min_tarde, $registrado_por, (int)$emp['turno_id'], $horaInicio, $horaFin]);
   }
 
   $msg = "Entrada registrada: " . $empleado["nombres"] . " " . $empleado["apellidos"];
@@ -227,6 +220,12 @@ if (!$asistencia || empty($asistencia["hora_entrada"])) {
   ]);
 
 } elseif (empty($asistencia["hora_salida"])) {
+  if (!empty($asistencia['turno_id_marcaje']) && !empty($asistencia['hora_inicio_marcaje']) && !empty($asistencia['hora_fin_marcaje'])) {
+    $horaInicio = (string)$asistencia['hora_inicio_marcaje'];
+    $horaFin = (string)$asistencia['hora_fin_marcaje'];
+    $tipoTurno = tipoTurnoVentanas((string)($asistencia['turno_marcaje_nombre'] ?? ''), (int)$asistencia['turno_id_marcaje']);
+    $tieneVentanaTurno = $tipoTurno !== null;
+  }
   if ($tieneVentanaTurno) {
     $ventanaSalida = validarVentanaSalidaTurno(
       $fecha_asistencia,

@@ -7,7 +7,10 @@ require_once __DIR__ . "/../includes/conexion.php";
 $returnQuery = trim((string)($_POST["return_query"] ?? ""));
 
 function asistenciaReturnUrl(string $key, string $message, array $extra = []): string {
-  global $returnQuery;
+  global $returnQuery, $pdo;
+  if ($key === 'err' && $pdo instanceof PDO && $pdo->inTransaction()) {
+    $pdo->rollBack();
+  }
 
   $params = [];
 
@@ -63,12 +66,13 @@ $uid = (int)($_SESSION["user"]["id"] ?? ($_SESSION["usuario_id"] ?? 0));
 $registrado_por = $uid > 0 ? $uid : null;
 
 // 1) Validar empleado y turno (para retardo)
+$pdo->beginTransaction();
 $stmt = $pdo->prepare("
   SELECT e.estado, e.turno_id, t.nombre AS turno_nombre, t.hora_inicio, t.hora_fin
   FROM empleados e
   LEFT JOIN turnos t ON t.id = e.turno_id
   WHERE e.id = ?
-  LIMIT 1
+  LIMIT 1 FOR UPDATE
 ");
 $stmt->execute([$empleado_id]);
 $emp = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -95,6 +99,10 @@ $tipoTurno = tipoTurnoVentanas(
 );
 
 $tieneVentanaTurno = $tipoTurno !== null;
+if (!$tieneVentanaTurno) {
+  header('Location: ' . asistenciaReturnUrl('err', 'Empleado sin turno valido asignado.'));
+  exit;
+}
 
 $esExcepcionAdmin = false;
 $motivoExcepcion = trim((string)($_POST["motivo_excepcion"] ?? ""));
@@ -225,28 +233,29 @@ if ($esExcepcionAdmin) {
 
 if ($row) {
   if ($esExcepcionAdmin) {
-    $upd = $pdo->prepare("UPDATE asistencias SET hora_entrada=?, estado=?, minutos_tarde=?, registrado_por=?, observacion_sistema=? WHERE id=?");
-    $upd->execute([$hora_now, $estado, $min_tarde, $registrado_por, $observacionSistema, (int)$row["id"]]);
+    $upd = $pdo->prepare("UPDATE asistencias SET hora_entrada=?, estado=?, minutos_tarde=?, registrado_por=?, observacion_sistema=?, turno_id_marcaje=?, hora_inicio_marcaje=?, hora_fin_marcaje=? WHERE id=?");
+    $upd->execute([$hora_now, $estado, $min_tarde, $registrado_por, $observacionSistema, (int)$emp['turno_id'], $horaInicio, $horaFin, (int)$row["id"]]);
   } else {
-    $upd = $pdo->prepare("UPDATE asistencias SET hora_entrada=?, estado=?, minutos_tarde=?, registrado_por=? WHERE id=?");
-    $upd->execute([$hora_now, $estado, $min_tarde, $registrado_por, (int)$row["id"]]);
+    $upd = $pdo->prepare("UPDATE asistencias SET hora_entrada=?, estado=?, minutos_tarde=?, registrado_por=?, turno_id_marcaje=?, hora_inicio_marcaje=?, hora_fin_marcaje=? WHERE id=?");
+    $upd->execute([$hora_now, $estado, $min_tarde, $registrado_por, (int)$emp['turno_id'], $horaInicio, $horaFin, (int)$row["id"]]);
   }
 } else {
   if ($esExcepcionAdmin) {
     $ins = $pdo->prepare("
-      INSERT INTO asistencias (empleado_id, fecha, estado, hora_entrada, minutos_tarde, registrado_por, observacion_sistema)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO asistencias (empleado_id, fecha, estado, hora_entrada, minutos_tarde, registrado_por, observacion_sistema, turno_id_marcaje, hora_inicio_marcaje, hora_fin_marcaje)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
-    $ins->execute([$empleado_id, $fecha_asistencia, $estado, $hora_now, $min_tarde, $registrado_por, $observacionSistema]);
+    $ins->execute([$empleado_id, $fecha_asistencia, $estado, $hora_now, $min_tarde, $registrado_por, $observacionSistema, (int)$emp['turno_id'], $horaInicio, $horaFin]);
   } else {
     $ins = $pdo->prepare("
-      INSERT INTO asistencias (empleado_id, fecha, estado, hora_entrada, minutos_tarde, registrado_por)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO asistencias (empleado_id, fecha, estado, hora_entrada, minutos_tarde, registrado_por, turno_id_marcaje, hora_inicio_marcaje, hora_fin_marcaje)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
-    $ins->execute([$empleado_id, $fecha_asistencia, $estado, $hora_now, $min_tarde, $registrado_por]);
+    $ins->execute([$empleado_id, $fecha_asistencia, $estado, $hora_now, $min_tarde, $registrado_por, (int)$emp['turno_id'], $horaInicio, $horaFin]);
   }
 }
 
+$pdo->commit();
 $mensaje = "Asistencia guardada con éxito";
 
 if ($esExcepcionAdmin) {

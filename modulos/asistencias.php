@@ -13,6 +13,9 @@ $active = "asistencias";
 require_once __DIR__ . "/../includes/header.php";
 
 $hoy = date("Y-m-d");
+$horaActualCaracas = date('H:i:s');
+require_once __DIR__ . '/../includes/calendario_laboral.php';
+$hoyEsLaborable = estadoBaseReporte($hoy, $hoy)['estado'] === 'AUSENTE';
 
 $msg = trim($_GET["msg"] ?? "");
 $err = trim($_GET["err"] ?? "");
@@ -80,11 +83,13 @@ if (!$tieneAlcanceGlobal) {
 
 function statusClass($status) {
   switch ($status) {
-    case "En Servicio":      return "status-present";
+    case "Asistió":         return "status-present";
     case "Retardo":          return "status-late";
     case "Reposo":           return "status-rest";
     case "Permiso":          return "status-justified";
     case "Ausente":          return "status-unjustified";
+    case "Pendiente":        return "status-justified";
+    case "No laborable":     return "status-disabled";
     case "Desincorporado":   return "status-disabled";
     case "Suspendido":       return "status-disabled";
     default:                 return "status-unjustified";
@@ -130,12 +135,15 @@ if ($turnoFiltro !== "") {
 $stmt = $pdo->prepare("
   SELECT
     COUNT(*) AS total_activos,
-    SUM(CASE WHEN r.reposo_id IS NOT NULL THEN 1 ELSE 0 END) AS reposos_hoy,
-    SUM(CASE WHEN r.reposo_id IS NULL AND p.permiso_id IS NOT NULL THEN 1 ELSE 0 END) AS permisos_hoy,
-    SUM(CASE WHEN r.reposo_id IS NULL AND p.permiso_id IS NULL AND a.es_retardo = 1 THEN 1 ELSE 0 END) AS retardos_hoy,
-    SUM(CASE WHEN r.reposo_id IS NULL AND p.permiso_id IS NULL AND a.es_retardo = 0 AND a.es_asistio = 1 THEN 1 ELSE 0 END) AS asistencias_hoy,
-    SUM(CASE WHEN r.reposo_id IS NULL AND p.permiso_id IS NULL AND a.es_retardo = 0 AND a.es_asistio = 0 THEN 1 ELSE 0 END) AS ausentes_hoy
+    SUM(CASE WHEN r.reposo_id IS NOT NULL AND COALESCE(a.es_retardo,0) = 0 AND COALESCE(a.es_asistio,0) = 0 THEN 1 ELSE 0 END) AS reposos_hoy,
+    SUM(CASE WHEN r.reposo_id IS NULL AND p.permiso_id IS NOT NULL AND COALESCE(a.es_retardo,0) = 0 AND COALESCE(a.es_asistio,0) = 0 THEN 1 ELSE 0 END) AS permisos_hoy,
+    SUM(CASE WHEN a.es_retardo = 1 THEN 1 ELSE 0 END) AS retardos_hoy,
+    SUM(CASE WHEN a.es_retardo = 0 AND a.es_asistio = 1 THEN 1 ELSE 0 END) AS asistencias_hoy,
+    SUM(CASE WHEN r.reposo_id IS NULL AND p.permiso_id IS NULL
+             AND COALESCE(a.es_retardo, 0) = 0 AND COALESCE(a.es_asistio, 0) = 0
+             AND ? >= ADDTIME(t.hora_inicio, '02:01:00') THEN 1 ELSE 0 END) AS ausentes_hoy
   FROM empleados e
+  LEFT JOIN turnos t ON t.id = e.turno_id
   LEFT JOIN (
     SELECT empleado_id, MIN(id) AS reposo_id
     FROM reposos
@@ -160,7 +168,7 @@ $stmt = $pdo->prepare("
   WHERE e.estado='ACTIVO'
   $turnoWhereParte
 ");
-$stmt->execute(array_merge([$hoy, $hoy, $hoy], $turnoParamsParte));
+$stmt->execute(array_merge([$horaActualCaracas, $hoy, $hoy, $hoy], $turnoParamsParte));
 $parte = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
 
 $totalNominaActiva = (int)($parte["total_activos"] ?? 0);
@@ -168,7 +176,7 @@ $asistenciasHoy    = (int)($parte["asistencias_hoy"] ?? 0);
 $retardosHoy       = (int)($parte["retardos_hoy"] ?? 0);
 $permisosHoy       = (int)($parte["permisos_hoy"] ?? 0);
 $repososHoy        = (int)($parte["reposos_hoy"] ?? 0);
-$ausentesHoy       = (int)($parte["ausentes_hoy"] ?? 0);
+$ausentesHoy       = $hoyEsLaborable ? (int)($parte["ausentes_hoy"] ?? 0) : 0;
 
 $where = [];
 $params = [];
@@ -197,15 +205,17 @@ if ($turnoFiltro !== "") {
 
 // Filtro de estado según prioridad operativa.
 if ($estadoFiltro === "REPOSO") {
-  $where[] = "e.estado = 'ACTIVO' AND r.reposo_id IS NOT NULL";
+  $where[] = "e.estado = 'ACTIVO' AND r.reposo_id IS NOT NULL AND COALESCE(a.es_retardo,0) = 0 AND COALESCE(a.es_asistio,0) = 0";
 } elseif ($estadoFiltro === "PERMISO") {
-  $where[] = "e.estado = 'ACTIVO' AND p.permiso_id IS NOT NULL AND r.reposo_id IS NULL";
+  $where[] = "e.estado = 'ACTIVO' AND p.permiso_id IS NOT NULL AND r.reposo_id IS NULL AND COALESCE(a.es_retardo,0) = 0 AND COALESCE(a.es_asistio,0) = 0";
 } elseif ($estadoFiltro === "RETARDO") {
-  $where[] = "e.estado = 'ACTIVO' AND a.es_retardo = 1 AND r.reposo_id IS NULL AND p.permiso_id IS NULL";
+  $where[] = "e.estado = 'ACTIVO' AND a.es_retardo = 1";
 } elseif ($estadoFiltro === "EN_SERVICIO") {
-  $where[] = "e.estado = 'ACTIVO' AND a.es_asistio = 1 AND a.es_retardo = 0 AND r.reposo_id IS NULL AND p.permiso_id IS NULL";
+  $where[] = "e.estado = 'ACTIVO' AND a.es_asistio = 1 AND a.es_retardo = 0";
 } elseif ($estadoFiltro === "AUSENTE") {
-  $where[] = "e.estado = 'ACTIVO' AND (a.es_asistio IS NULL OR a.es_asistio = 0) AND (a.es_retardo IS NULL OR a.es_retardo = 0) AND r.reposo_id IS NULL AND p.permiso_id IS NULL";
+  $where[] = "e.estado = 'ACTIVO' AND (a.es_asistio IS NULL OR a.es_asistio = 0) AND (a.es_retardo IS NULL OR a.es_retardo = 0) AND r.reposo_id IS NULL AND p.permiso_id IS NULL AND ? >= ADDTIME(t.hora_inicio, '02:01:00')";
+  $params[] = $horaActualCaracas;
+  if (!$hoyEsLaborable) $where[] = '1 = 0';
 } elseif ($estadoFiltro === "DESINCORPORADO") {
   $where[] = "e.estado = 'RETIRADO'";
 } elseif ($estadoFiltro === "SUSPENDIDO") {
@@ -222,6 +232,7 @@ SELECT
   e.estado AS estado_empleado,
   t.id AS turno_id,
   t.nombre AS turno_nombre,
+  t.hora_inicio AS inicio_turno,
   a.es_retardo,
   a.es_asistio,
   a.hora_entrada,
@@ -303,16 +314,23 @@ foreach ($rows as $row) {
   if ($noActivo) {
     $status = estadoEmpleadoLabel($estadoEmpRaw);
   } else {
-    if (!empty($row["reposo_hoy"])) {
+    if ((int)($row["es_retardo"] ?? 0) === 1) {
+      $status = "Retardo";
+    } elseif ((int)($row["es_asistio"] ?? 0) === 1) {
+      $status = "Asistió";
+    } elseif (!empty($row["reposo_hoy"])) {
       $status = "Reposo";
     } elseif (!empty($row["permiso_hoy"])) {
       $status = "Permiso";
-    } elseif ((int)($row["es_retardo"] ?? 0) === 1) {
-      $status = "Retardo";
-    } elseif ((int)($row["es_asistio"] ?? 0) === 1) {
-      $status = "En Servicio";
     } else {
-      $status = "Ausente";
+      $inicioHoy = trim((string)($row['inicio_turno'] ?? ''));
+      if (!$hoyEsLaborable) {
+        $status = 'No laborable';
+      } elseif ($inicioHoy !== '' && $horaActualCaracas < date('H:i:s', strtotime($inicioHoy . ' +121 minutes'))) {
+        $status = 'Pendiente';
+      } else {
+        $status = 'Ausente';
+      }
     }
   }
 
@@ -855,7 +873,7 @@ tbody td:last-child{
 
     <select class="select" name="estado">
       <option value="" <?php echo $estadoFiltro===""?"selected":""; ?>>Todos</option>
-      <option value="EN_SERVICIO" <?php echo $estadoFiltro==="EN_SERVICIO"?"selected":""; ?>>En Servicio</option>
+      <option value="EN_SERVICIO" <?php echo $estadoFiltro==="EN_SERVICIO"?"selected":""; ?>>Asistió</option>
       <option value="RETARDO" <?php echo $estadoFiltro==="RETARDO"?"selected":""; ?>>Retardo</option>
       <option value="PERMISO" <?php echo $estadoFiltro==="PERMISO"?"selected":""; ?>>Permiso</option>
       <option value="REPOSO" <?php echo $estadoFiltro==="REPOSO"?"selected":""; ?>>Reposo</option>
@@ -950,7 +968,10 @@ tbody td:last-child{
           $tienePermiso = !empty($e["permiso_hoy"]);
           $noActivo     = empleadoNoActivo($e["estado_empleado"] ?? "");
 
-          $bloquear = ($tieneReposo || $tienePermiso || $noActivo);
+          $bloquear = ($tieneReposo || $tienePermiso || $noActivo || !empty($e["hora_entrada"]));
+          // Una jornada iniciada siempre puede cerrarse aunque exista un
+          // permiso/reposo registrado posteriormente.
+          $bloquearSalida = $noActivo || empty($e['hora_entrada']) || !empty($e['hora_salida']);
 
           $motivos = [];
           if ($noActivo) $motivos[] = strtolower(estadoEmpleadoLabel($e["estado_empleado"] ?? ""));
@@ -1014,7 +1035,7 @@ if ($inicialFoto === "") {
     <?php echo csrfInput(); ?>
                 <input type="hidden" name="empleado_id" value="<?php echo (int)$e["id"]; ?>">
                 <input type="hidden" name="return_query" value="<?php echo e($returnQuery); ?>">
-                <button class="mini out" type="submit" <?php echo $bloquear ? "disabled" : ""; ?>>Salida</button>
+                <button class="mini out" type="submit" <?php echo $bloquearSalida ? "disabled" : ""; ?>>Salida</button>
                 <?php if ($tieneAlcanceGlobal && $tieneVentanaFila): ?>
                   <details class="admin-exception">
                     <summary>Excepción administrativa</summary>

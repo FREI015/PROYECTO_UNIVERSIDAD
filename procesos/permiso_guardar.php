@@ -93,6 +93,16 @@ try {
     header("Location: " . BASE_URL . "/modulos/permisos.php?err=" . urlencode("El empleado no esta activo."));
     exit;
   }
+  // Evita superponer un permiso posterior con una jornada ya comenzada.
+  $asistenciaExistente = $pdo->prepare("SELECT id FROM asistencias
+    WHERE empleado_id = ? AND fecha BETWEEN ? AND ?
+      AND hora_entrada IS NOT NULL LIMIT 1");
+  $asistenciaExistente->execute([$empleado_id, $fecha_inicio, $fecha_fin]);
+  if ($asistenciaExistente->fetchColumn() !== false) {
+    $pdo->rollBack();
+    header('Location: ' . BASE_URL . '/modulos/permisos.php?err=' . urlencode('Existe una asistencia registrada en ese periodo. Requiere revision administrativa.'));
+    exit;
+  }
   foreach (['permisos', 'reposos'] as $tabla) {
     $conflicto = $pdo->prepare("SELECT id FROM {$tabla}
       WHERE empleado_id = ? AND estado = 'ACTIVO'

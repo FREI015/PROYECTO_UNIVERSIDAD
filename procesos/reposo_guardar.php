@@ -123,6 +123,17 @@ try {
     exit;
   }
 
+  // No se puede registrar reposo que invalide una entrada ya efectuada.
+  $asistenciaExistente = $pdo->prepare("SELECT id FROM asistencias
+    WHERE empleado_id = ? AND fecha BETWEEN ? AND ?
+      AND hora_entrada IS NOT NULL LIMIT 1");
+  $asistenciaExistente->execute([$empleado_id, $fecha_inicio, $fecha_fin]);
+  if ($asistenciaExistente->fetchColumn() !== false) {
+    $pdo->rollBack();
+    header('Location: ' . BASE_URL . '/modulos/reposos.php?err=' . urlencode('Existe una asistencia registrada en ese periodo. Requiere revision administrativa.'));
+    exit;
+  }
+
   // Dos rangos se solapan cuando inicio1 <= fin2 y fin1 >= inicio2.
   $conflicto = $pdo->prepare("
     SELECT id

@@ -1403,15 +1403,17 @@ function marcarAsistenciasSinSalidaVencidas(
       a.fecha,
       a.hora_entrada,
       a.observacion_sistema,
-      t.id AS turno_id,
-      t.nombre AS turno_nombre,
-      t.hora_inicio,
-      t.hora_fin
+      COALESCE(a.turno_id_marcaje, t.id) AS turno_id,
+      COALESCE(tm.nombre, t.nombre) AS turno_nombre,
+      COALESCE(a.hora_inicio_marcaje, t.hora_inicio) AS hora_inicio,
+      COALESCE(a.hora_fin_marcaje, t.hora_fin) AS hora_fin
     FROM asistencias a
     INNER JOIN empleados e
       ON e.id = a.empleado_id
     LEFT JOIN turnos t
       ON t.id = e.turno_id
+    LEFT JOIN turnos tm
+      ON tm.id = a.turno_id_marcaje
     WHERE
       a.hora_entrada IS NOT NULL
       AND a.hora_salida IS NULL
@@ -1470,6 +1472,12 @@ function marcarAsistenciasSinSalidaVencidas(
       );
 
       if ($tipoTurnoFila !== null) {
+        $configTurnoFila = configuracionVentanaTurnoEmpleado(
+          $tipoTurnoFila, $horaInicio, $horaFin
+        );
+        if (!empty($configTurnoFila['horario_invalido'])) {
+          continue;
+        }
         $finTurno = limiteSalidaTurno(
           (string)$fila["fecha"],
           $tz,
@@ -1628,6 +1636,11 @@ function tipoTurnoVentanas(
     return "COMPLETO";
   }
 
+  // Turnos adicionales deben tener horas validas en MySQL.
+  if ((int)$turnoId > 0 && trim((string)$turnoNombre) !== "") {
+    return "OTRO";
+  }
+
   return null;
 }
 
@@ -1642,7 +1655,7 @@ function configuracionVentanaTurno(string $tipoTurno): array {
         : "09:00:00",
       "salida_desde" => defined("SEGUNDO_TURNO_SALIDA_DESDE")
         ? (string)constant("SEGUNDO_TURNO_SALIDA_DESDE")
-        : "17:00:00",
+        : "16:55:00",
       "salida_hasta" => defined("SEGUNDO_TURNO_SALIDA_HASTA")
         ? (string)constant("SEGUNDO_TURNO_SALIDA_HASTA")
         : "18:00:00",
@@ -1660,12 +1673,12 @@ function configuracionVentanaTurno(string $tipoTurno): array {
         : "15:00:00",
       "salida_desde" => defined("SEGUNDO_TURNO_SALIDA_DESDE")
         ? (string)constant("SEGUNDO_TURNO_SALIDA_DESDE")
-        : "17:00:00",
+        : "16:55:00",
       "salida_hasta" => defined("SEGUNDO_TURNO_SALIDA_HASTA")
         ? (string)constant("SEGUNDO_TURNO_SALIDA_HASTA")
         : "18:00:00",
       "entrada_error" => "No es posible registrar la entrada. El horario permitido para el segundo turno es de 12:55 PM a 3:00 PM.",
-      "salida_error" => "No es posible registrar la salida. El horario permitido es de 5:00 PM a 6:00 PM.",
+      "salida_error" => "No es posible registrar la salida. El horario permitido es de 4:55 PM a 6:00 PM.",
     ];
   }
 
@@ -1678,20 +1691,20 @@ function configuracionVentanaTurno(string $tipoTurno): array {
       : "09:00:00",
     "salida_desde" => defined("PRIMER_TURNO_SALIDA_DESDE")
       ? (string)constant("PRIMER_TURNO_SALIDA_DESDE")
-      : "12:00:00",
+      : "11:55:00",
     "salida_hasta" => defined("PRIMER_TURNO_SALIDA_HASTA")
       ? (string)constant("PRIMER_TURNO_SALIDA_HASTA")
       : "13:00:00",
     "entrada_error" => "No es posible registrar la entrada. El horario permitido para el primer turno es de 6:55 AM a 9:00 AM.",
-    "salida_error" => "No es posible registrar la salida. El horario permitido es de 12:00 PM a 1:00 PM.",
+    "salida_error" => "No es posible registrar la salida. El horario permitido es de 11:55 AM a 1:00 PM.",
   ];
 }
 
 /**
  * Ventanas de marcaje basadas en las horas del turno guardadas en MySQL.
  * Entrada: 5 minutos antes y 120 minutos despues del inicio.
- * Salida: desde la hora de fin hasta 60 minutos despues.
- * Si no existe horario valido, conserva los valores de configuracion.
+ * Salida: desde 5 minutos antes del fin hasta 60 minutos despues.
+ * Si no existe horario valido, rechaza el marcaje ordinario.
  */
 function configuracionVentanaTurnoEmpleado(
   string $tipoTurno,
@@ -1704,13 +1717,14 @@ function configuracionVentanaTurnoEmpleado(
   if (!preg_match('/^([01]\d|2[0-3]):[0-5]\d:[0-5]\d$/', $hi)
       || !preg_match('/^([01]\d|2[0-3]):[0-5]\d:[0-5]\d$/', $hf)
       || $hi >= $hf) {
+    $config['horario_invalido'] = true;
     return $config;
   }
   $inicio = new DateTimeImmutable('2000-01-01 ' . $hi);
   $fin = new DateTimeImmutable('2000-01-01 ' . $hf);
   $config['entrada_desde'] = $inicio->modify('-5 minutes')->format('H:i:s');
   $config['entrada_hasta'] = $inicio->modify('+120 minutes')->format('H:i:s');
-  $config['salida_desde'] = $fin->format('H:i:s');
+  $config['salida_desde'] = $fin->modify('-5 minutes')->format('H:i:s');
   $config['salida_hasta'] = $fin->modify('+60 minutes')->format('H:i:s');
   $config['entrada_error'] = 'Entrada permitida entre ' . $config['entrada_desde'] . ' y ' . $config['entrada_hasta'] . '.';
   $config['salida_error'] = 'Salida permitida entre ' . $config['salida_desde'] . ' y ' . $config['salida_hasta'] . '.';
@@ -1756,6 +1770,9 @@ function validarVentanaEntradaTurno(
   ?string $horaFin = null
 ): array {
   $config = configuracionVentanaTurnoEmpleado($tipoTurno, $horaInicio, $horaFin);
+  if (!empty($config['horario_invalido'])) {
+    return ['ok' => false, 'error' => 'Turno sin horario valido configurado.'];
+  }
 
   $rango = rangoVentanaTurno(
     $fechaAsistencia,
@@ -1789,6 +1806,9 @@ function validarVentanaSalidaTurno(
   ?string $horaFin = null
 ): array {
   $config = configuracionVentanaTurnoEmpleado($tipoTurno, $horaInicio, $horaFin);
+  if (!empty($config['horario_invalido'])) {
+    return ['ok' => false, 'error' => 'Turno sin horario valido configurado.'];
+  }
 
   $rango = rangoVentanaTurno(
     $fechaAsistencia,
@@ -1825,6 +1845,9 @@ function limiteSalidaTurno(
   ?string $horaFin = null
 ): DateTimeImmutable {
   $config = configuracionVentanaTurnoEmpleado($tipoTurno, $horaInicio, $horaFin);
+  if (!empty($config['horario_invalido'])) {
+    throw new InvalidArgumentException('Turno sin hora valida de salida.');
+  }
 
   return (new DateTimeImmutable(
     $fechaAsistencia . " " . $config["salida_hasta"],
@@ -1875,24 +1898,23 @@ function calcularSalidaAsistencia(
     $diferenciaFinSegundos =
       $ahora->getTimestamp() - $finTurno->getTimestamp();
 
-    if ($diferenciaFinSegundos > 0) {
-      $minutosSalidaTardia =
-        (int)ceil($diferenciaFinSegundos / 60);
-    }
-
-    $toleranciaSalidaTardia = defined(
-      "SALIDA_TARDIA_TOLERANCIA_MINUTOS"
-    )
-      ? max(
-          0,
-          (int)constant("SALIDA_TARDIA_TOLERANCIA_MINUTOS")
-        )
-      : 0;
-
-    if ($minutosSalidaTardia > $toleranciaSalidaTardia) {
-      $salidaEstado = "SALIDA_TARDIA";
+    // Salida normal desde 5 minutos antes hasta 5 minutos despues del fin.
+    // Los minutos tardios son los transcurridos DESPUES de la tolerancia.
+    $toleranciaSalidaMin = defined('SALIDA_TARDIA_TOLERANCIA_MINUTOS')
+      ? max(0, (int)constant('SALIDA_TARDIA_TOLERANCIA_MINUTOS')) : 5;
+    $graciaSegundos = $toleranciaSalidaMin * 60;
+    if ($diferenciaFinSegundos > $graciaSegundos) {
+      $minutosSalidaTardia = (int)ceil(
+        ($diferenciaFinSegundos - $graciaSegundos) / 60
+      );
+      $salidaEstado = 'SALIDA_TARDIA';
       $observacionSistema =
-        "Salida tardía: {$minutosSalidaTardia} min después del fin del turno ({$horaFin}).";
+        "Salida tardia: {$minutosSalidaTardia} min despues de la tolerancia ({$horaFin}).";
+    } elseif ($diferenciaFinSegundos < -$graciaSegundos) {
+      // Solo deberia llegar aqui una excepcion administrativa autorizada.
+      $salidaEstado = 'SALIDA_ANTICIPADA';
+      $observacionSistema =
+        'Salida anticipada respecto del fin del turno (' . $horaFin . ').';
     }
   } else {
     $salidaEstado = "SIN_HORARIO";

@@ -77,6 +77,11 @@ if (!defined("ASISTENCIA_MARGEN_ANTES_MINUTOS")) {
   define("ASISTENCIA_MARGEN_ANTES_MINUTOS", 5);
 }
 
+// Tolerancia simetrica de salida: 5 minutos antes y 5 despues.
+if (!defined("SALIDA_TARDIA_TOLERANCIA_MINUTOS")) {
+  define("SALIDA_TARDIA_TOLERANCIA_MINUTOS", 5);
+}
+
 /**
  * Ventanas horarias del primer turno.
  *
@@ -104,7 +109,7 @@ if (!defined("PRIMER_TURNO_ENTRADA_HASTA")) {
 }
 
 if (!defined("PRIMER_TURNO_SALIDA_DESDE")) {
-  define("PRIMER_TURNO_SALIDA_DESDE", "12:00:00");
+  define("PRIMER_TURNO_SALIDA_DESDE", "11:55:00");
 }
 
 if (!defined("PRIMER_TURNO_SALIDA_HASTA")) {
@@ -138,7 +143,7 @@ if (!defined("SEGUNDO_TURNO_ENTRADA_HASTA")) {
 }
 
 if (!defined("SEGUNDO_TURNO_SALIDA_DESDE")) {
-  define("SEGUNDO_TURNO_SALIDA_DESDE", "17:00:00");
+  define("SEGUNDO_TURNO_SALIDA_DESDE", "16:55:00");
 }
 
 if (!defined("SEGUNDO_TURNO_SALIDA_HASTA")) {

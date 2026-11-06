@@ -9,7 +9,26 @@ Ejecutar `sql/05_auditoria_e_historial.sql` una única vez en una base de prueba
 En Reposos se puede adjuntar PDF/JPG/PNG (hasta 5 MB). Los archivos se guardan en `uploads/justificativos/` con acceso web directo denegado por `.htaccess`. La descarga usa sesión y permisos por turno. Probar con sesión autorizada, sin sesión y con usuario de otro turno. **Importante:** comprobar HTTP 403 con la URL directa al archivo; depende de Apache/AllowOverride.
 
 ## H-07: cargos y turnos
-Dentro de `modulos/personal.php` existe el apartado desplegable «Configurar cargos y turnos», disponible para Directora y Subdirector. No existe una pagina independiente de catalogos. No eliminar ni renombrar turnos institucionales; no modificar catálogos asignados al personal. Probar creación, edición y eliminación de elementos de prueba.
+<!-- H07_CATALOGOS_INTEGRIDAD_V2 -->
+
+La administracion de cargos y turnos permanece integrada en Personal y restringida a Directora y Subdirector.
+
+- Los cargos institucionales DOCENTE, ADMINISTRATIVO, OBRERO y DIRECTIVO permanecen protegidos.
+- Los cargos no pueden modificarse ni eliminarse mientras tengan empleados asignados.
+- MATUTINO (07:00-12:00), VESPERTINO (13:00-17:00) y COMPLETO (07:00-17:00) son institucionales y permanecen protegidos.
+- Los turnos adicionales requieren soporte del motor de ventanas de asistencia.
+- Los turnos adicionales no pueden modificarse ni eliminarse cuando tengan empleados o asistencias asociadas.
+- Las asistencias conservan turno, hora inicial y hora final del momento del marcaje.
+- La FK impide eliminar turnos que tengan referencias historicas.
+- Los registros antiguos sin turno identificado no se completan artificialmente.
+- MariaDB aplica restricciones CHECK y triggers para impedir modificaciones directas incompatibles.
+- Los nombres de cargos y turnos son unicos.
+- La auditoria conserva los valores anteriores y nuevos de cada operacion administrativa.
+- La interfaz y el servidor aplican las mismas restricciones de negocio.
+
+La migracion estructural se encuentra en `sql/08_integridad_catalogos.sql`.
+El instalador aplica cada cambio de forma condicional y verifica el resultado.
+- MariaDB mantiene nueve triggers H-07: seis protecciones existentes y tres controles adicionales para impedir inserciones no canonicas y conversiones de turnos a nombres o identificadores institucionales reservados.
 
 ## H-12: reportes
 Las fechas futuras y días no laborables ya no se cuentan como ausencias automáticas. Por defecto son laborables lunes-viernes. Para instituciones que abren fines de semana o tienen feriados, configurar en `includes/config.php` antes de `session_start()`:

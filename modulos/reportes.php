@@ -190,7 +190,7 @@ function eopt($v){ return htmlspecialchars((string)$v, ENT_QUOTES, "UTF-8"); }
       <strong>Cómo se toma el rango:</strong><br>
       - Si colocas <em>Desde</em> y <em>Hasta</em>, se usa ese rango (ideal para "Personalizado").<br>
       - Si no colocas <em>Desde</em> y <em>Hasta</em>, el sistema calcula el rango segun el <em>Periodo</em> seleccionado.<br>
-      - El estado diario sigue la prioridad: <strong>Reposo</strong> &gt; <strong>Permiso</strong> &gt; <strong>Retardo</strong> &gt; <strong>A tiempo</strong> &gt; <strong>Ausente</strong>.
+      - Cuando existe una entrada registrada, prevalece la asistencia o el retardo. Sin entrada, se consideran reposos y permisos. Las incidencias de salida se muestran por separado.
     </div>
   </form>
 
