@@ -11,6 +11,175 @@ require_once __DIR__ . "/../includes/conexion.php";
 
 $redirect_url = BASE_URL . "/login_empleado.php";
 
+function barcode_esAjax(): bool {
+  $header = strtoupper(
+    trim((string)($_SERVER["HTTP_X_REQUESTED_WITH"] ?? ""))
+  );
+
+  if ($header === "XMLHTTPREQUEST") {
+    return true;
+  }
+
+  $accept = strtolower(
+    (string)($_SERVER["HTTP_ACCEPT"] ?? "")
+  );
+
+  return strpos($accept, "application/json") !== false;
+}
+
+function barcode_requestId(): string {
+  $id = trim((string)($_POST["request_id"] ?? ""));
+
+  if (
+    $id === "" ||
+    strlen($id) > 80 ||
+    !preg_match('/^[A-Za-z0-9._:-]+$/', $id)
+  ) {
+    return "";
+  }
+
+  return $id;
+}
+
+/**
+ * Normaliza el codigo recibido:
+ * - conserva ceros iniciales (siempre trabaja como texto);
+ * - quita BOM, espacios y comillas externas del CSV;
+ * - unifica a mayusculas, igual que empleados.codigo_barra.
+ */
+function barcode_normalizarCodigo(string $raw): array {
+  $codigo = preg_replace('/^\xEF\xBB\xBF/', '', $raw);
+  $codigo = trim((string)$codigo);
+
+  while (strlen($codigo) >= 2) {
+    $primero = $codigo[0];
+    $ultimo = $codigo[strlen($codigo) - 1];
+
+    if (
+      ($primero === '"' && $ultimo === '"') ||
+      ($primero === "'" && $ultimo === "'")
+    ) {
+      $codigo = trim(substr($codigo, 1, -1));
+      continue;
+    }
+
+    break;
+  }
+
+  $codigo = str_replace(["\r", "\n", "\t"], "", $codigo);
+  $codigo = strtoupper($codigo);
+
+  if ($codigo === "") {
+    return [
+      "codigo" => "",
+      "error" => "El código de barras está vacío.",
+    ];
+  }
+
+  if (strlen($codigo) > 50) {
+    return [
+      "codigo" => "",
+      "error" => "El código de barras no debe superar 50 caracteres.",
+    ];
+  }
+
+  if (
+    preg_match('/[\x00-\x1F\x7F]/', $codigo) ||
+    preg_match('/[\s"\']/', $codigo)
+  ) {
+    return [
+      "codigo" => "",
+      "error" => "El código de barras contiene caracteres no válidos.",
+    ];
+  }
+
+  return [
+    "codigo" => $codigo,
+    "error" => null,
+  ];
+}
+
+function barcode_payload(array $params): array {
+  $tipo = (string)($params["barcode_type"] ?? "error");
+
+  if (
+    !in_array($tipo, ["success", "error", "warning", "info", "csrf"], true)
+  ) {
+    $tipo = "error";
+  }
+
+  return [
+    "ok" => $tipo === "success",
+    "type" => $tipo,
+    "message" => (string)($params["barcode_msg"] ?? ""),
+    "accion" => isset($params["ok_asistencia"])
+      ? (string)$params["ok_asistencia"]
+      : null,
+    "empleado" => isset($params["empleado_nombre"])
+      ? (string)$params["empleado_nombre"]
+      : null,
+    "empleado_id" => isset($params["empleado_id"])
+      ? (int)$params["empleado_id"]
+      : null,
+    "hora" => isset($params["hora"])
+      ? (string)$params["hora"]
+      : null,
+    "estado" => isset($params["estado"])
+      ? (string)$params["estado"]
+      : null,
+    "minutos_tarde" => isset($params["min_tarde"])
+      ? (int)$params["min_tarde"]
+      : 0,
+    "salida_estado" => isset($params["salida_estado"])
+      ? (string)$params["salida_estado"]
+      : null,
+    "minutos_salida_tardia" => isset($params["min_salida_tardia"])
+      ? (int)$params["min_salida_tardia"]
+      : 0,
+    "duplicate" => !empty($params["duplicate"]),
+    "request_id" => barcode_requestId(),
+  ];
+}
+
+function barcode_respuestaGuardada(string $requestId): ?array {
+  if ($requestId === "") {
+    return null;
+  }
+
+  $store = $_SESSION["kiosk_barcode_respuestas"] ?? null;
+
+  if (!is_array($store) || !isset($store[$requestId])) {
+    return null;
+  }
+
+  $respuesta = $store[$requestId];
+
+  return is_array($respuesta) ? $respuesta : null;
+}
+
+function barcode_guardarRespuesta(
+  string $requestId,
+  array $payload
+): void {
+  if ($requestId === "" || ($payload["type"] ?? "") === "csrf") {
+    return;
+  }
+
+  $store = $_SESSION["kiosk_barcode_respuestas"] ?? [];
+
+  if (!is_array($store)) {
+    $store = [];
+  }
+
+  $store[$requestId] = $payload;
+
+  if (count($store) > 50) {
+    $store = array_slice($store, -50, null, true);
+  }
+
+  $_SESSION["kiosk_barcode_respuestas"] = $store;
+}
+
 function barcode_redirect($url, $params = []) {
   global $redirect_url, $pdo;
 
@@ -33,10 +202,22 @@ function barcode_redirect($url, $params = []) {
     }
   }
 
+  $payload = barcode_payload($params);
+  barcode_guardarRespuesta(barcode_requestId(), $payload);
+
+  if (barcode_esAjax()) {
+    header("Content-Type: application/json; charset=utf-8");
+    echo json_encode($payload, JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+
   if (($params["barcode_type"] ?? "") === "success" && isset($params["empleado_id"])) {
     $_SESSION["kiosk_ok_empleado_id"] = (int)$params["empleado_id"];
     unset($params["empleado_id"]);
   }
+
+  unset($params["empleado_nombre"]);
+
   $base = $redirect_url;
   $sep = strpos($base, "?") === false ? "?" : "&";
   foreach ($params as $k => $v) {
@@ -47,51 +228,136 @@ function barcode_redirect($url, $params = []) {
   exit;
 }
 
-function barcode_err($msg) {
-  barcode_redirect("", ["barcode_msg" => $msg, "barcode_type" => "error"]);
+function barcode_err($msg, $tipo = "error") {
+  barcode_redirect("", ["barcode_msg" => $msg, "barcode_type" => $tipo]);
 }
 
 if ($_SERVER["REQUEST_METHOD"] !== "POST") {
   barcode_err("Acceso inválido");
 }
 
-$csrf_redirect_url = $redirect_url . (strpos($redirect_url, "?") === false ? "?" : "&") . "barcode_msg=" . urlencode("Solicitud invalida. Intenta nuevamente.") . "&barcode_type=error";
-verifyCsrfOrRedirect($csrf_redirect_url);
-  $ahoraRate = time();
-  $ventanaRate = $ahoraRate - 60;
-  $historialIntentos = $_SESSION["kiosk_barcode_rate"] ?? [];
+$csrf_redirect_url = $redirect_url
+  . (strpos($redirect_url, "?") === false ? "?" : "&")
+  . "barcode_msg=" . urlencode("Solicitud invalida. Intenta nuevamente.")
+  . "&barcode_type=error";
 
-  if (!is_array($historialIntentos)) {
-    $historialIntentos = [];
+if (barcode_esAjax()) {
+  $csrfToken = $_POST["csrf_token"] ?? "";
+  $csrfSesion = $_SESSION["csrf_token"] ?? "";
+
+  if (
+    !is_string($csrfToken) ||
+    !is_string($csrfSesion) ||
+    $csrfToken === "" ||
+    $csrfSesion === "" ||
+    !hash_equals($csrfSesion, $csrfToken)
+  ) {
+    barcode_err("Solicitud invalida. Intenta nuevamente.", "csrf");
   }
+} else {
+  verifyCsrfOrRedirect($csrf_redirect_url);
+}
 
-  $intentosRecientes = [];
-  foreach ($historialIntentos as $tsIntento) {
-    $tsIntento = (int)$tsIntento;
-    if ($tsIntento >= $ventanaRate) {
-      $intentosRecientes[] = $tsIntento;
+$requestId = barcode_requestId();
+
+if ($requestId !== "") {
+  $respuestaGuardada = barcode_respuestaGuardada($requestId);
+
+  if ($respuestaGuardada !== null) {
+    if (barcode_esAjax()) {
+      header("Content-Type: application/json; charset=utf-8");
+      echo json_encode($respuestaGuardada, JSON_UNESCAPED_UNICODE);
+      exit;
     }
+
+    $paramsGuardados = [
+      "barcode_msg" => (string)($respuestaGuardada["message"] ?? ""),
+      "barcode_type" => (string)($respuestaGuardada["type"] ?? "error"),
+    ];
+
+    foreach ([
+      "accion" => "ok_asistencia",
+      "empleado_id" => "empleado_id",
+      "hora" => "hora",
+      "estado" => "estado",
+      "minutos_tarde" => "min_tarde",
+      "salida_estado" => "salida_estado",
+      "minutos_salida_tardia" => "min_salida_tardia",
+    ] as $campoPayload => $campoRedirect) {
+      if (isset($respuestaGuardada[$campoPayload])) {
+        $paramsGuardados[$campoRedirect] = $respuestaGuardada[$campoPayload];
+      }
+    }
+
+    barcode_redirect("", $paramsGuardados);
   }
+}
 
-  if (count($intentosRecientes) >= 20) {
-    barcode_err("Demasiados intentos. Espera un minuto.");
+$ahoraRate = time();
+$ventanaRate = $ahoraRate - 60;
+$historialIntentos = $_SESSION["kiosk_barcode_rate"] ?? [];
+
+if (!is_array($historialIntentos)) {
+  $historialIntentos = [];
+}
+
+$intentosRecientes = [];
+foreach ($historialIntentos as $tsIntento) {
+  $tsIntento = (int)$tsIntento;
+  if ($tsIntento >= $ventanaRate) {
+    $intentosRecientes[] = $tsIntento;
   }
+}
 
-  $intentosRecientes[] = $ahoraRate;
-  $_SESSION["kiosk_barcode_rate"] = $intentosRecientes;
+$limiteBarcodeMinuto = defined("BARCODE_RATE_LIMIT_POR_MINUTO")
+  ? max(1, (int)constant("BARCODE_RATE_LIMIT_POR_MINUTO"))
+  : 120;
 
+if (count($intentosRecientes) >= $limiteBarcodeMinuto) {
+  barcode_err("Demasiados intentos. Espera un minuto.");
+}
 
-$codigo_barra = trim($_POST["codigo_barra"] ?? "");
-if ($codigo_barra === "") {
-  barcode_err("CÓdigo de barras vacío");
+$intentosRecientes[] = $ahoraRate;
+$_SESSION["kiosk_barcode_rate"] = $intentosRecientes;
+
+$codigoNormalizado = barcode_normalizarCodigo(
+  (string)($_POST["codigo_barra"] ?? "")
+);
+
+if ($codigoNormalizado["error"] !== null) {
+  barcode_err((string)$codigoNormalizado["error"]);
+}
+
+$codigo_barra = (string)$codigoNormalizado["codigo"];
+
+$segundosDuplicado = defined("BARCODE_DUPLICADO_SEGUNDOS")
+  ? max(1, (int)constant("BARCODE_DUPLICADO_SEGUNDOS"))
+  : 5;
+
+$ultimoBarcode = $_SESSION["kiosk_barcode_ultimo"] ?? null;
+
+if (
+  is_array($ultimoBarcode) &&
+  (string)($ultimoBarcode["codigo"] ?? "") === $codigo_barra &&
+  (time() - (int)($ultimoBarcode["ts"] ?? 0)) < $segundosDuplicado
+) {
+  barcode_redirect("", [
+    "barcode_msg" => "Lectura repetida ignorada. Espera unos segundos antes de volver a escanear.",
+    "barcode_type" => "warning",
+    "duplicate" => true,
+  ]);
 }
 
 $empleado = empleadoPorCodigoBarra($pdo, $codigo_barra);
 if (!$empleado) {
-  barcode_err("No se encontrÓ un empleado con ese cÓdigo de barras");
+  barcode_err("No se encontró un empleado con ese código de barras");
 }
 
 $empleado_id = (int)$empleado["id"];
+
+$nombreEmpleado = trim(
+  (string)$empleado["nombres"] . " " . (string)$empleado["apellidos"]
+);
 
 $pdo->beginTransaction();
 $stmt = $pdo->prepare("SELECT e.estado, e.turno_id, t.nombre AS turno_nombre, t.hora_inicio, t.hora_fin
@@ -209,11 +475,17 @@ if (!$asistencia || empty($asistencia["hora_entrada"])) {
       : "Asistencia registrada correctamente. Entrada puntual.";
   }
 
+  $_SESSION["kiosk_barcode_ultimo"] = [
+    "codigo" => $codigo_barra,
+    "ts" => time(),
+  ];
+
   barcode_redirect("", [
     "barcode_msg" => $msg,
     "barcode_type" => "success",
     "ok_asistencia" => "entrada",
     "empleado_id" => $empleado_id,
+    "empleado_nombre" => $nombreEmpleado,
     "estado" => $estado,
     "hora" => $hora_now,
     "min_tarde" => $min_tarde
@@ -296,11 +568,17 @@ if ($tieneVentanaTurno) {
   $msg = "Salida registrada correctamente.";
 }
 
+  $_SESSION["kiosk_barcode_ultimo"] = [
+    "codigo" => $codigo_barra,
+    "ts" => time(),
+  ];
+
   barcode_redirect("", [
     "barcode_msg" => $msg,
     "barcode_type" => "success",
     "ok_asistencia" => "salida",
     "empleado_id" => $empleado_id,
+    "empleado_nombre" => $nombreEmpleado,
     "estado" => $asistencia["estado"],
     "hora" => $hora_now,
     "salida_estado" => $salidaEstado,
@@ -314,4 +592,3 @@ if ($tieneVentanaTurno) {
 
   barcode_err($mensajeDuplicado);
 }
-

@@ -31,7 +31,31 @@ define("BASE_ORIGIN", $origin);
 
 date_default_timezone_set("America/Caracas");
 
-ini_set("session.gc_maxlifetime", 3600);
+$scriptActual = str_replace(
+  "\\",
+  "/",
+  (string)($_SERVER["SCRIPT_NAME"] ?? "")
+);
+
+$esFotoKiosco =
+  substr($scriptActual, -strlen("/procesos/foto_empleado.php")) === "/procesos/foto_empleado.php" &&
+  isset($_GET["k"]) &&
+  (string)$_GET["k"] !== "";
+
+$esRutaKiosco =
+  substr($scriptActual, -strlen("/login_empleado.php")) === "/login_empleado.php" ||
+  substr($scriptActual, -strlen("/procesos/asistencia_barcode.php")) === "/procesos/asistencia_barcode.php" ||
+  substr($scriptActual, -strlen("/procesos/kiosk_token.php")) === "/procesos/kiosk_token.php" ||
+  $esFotoKiosco;
+
+if ($esRutaKiosco) {
+  session_name("KIOSKSESSID");
+}
+
+ini_set(
+  "session.gc_maxlifetime",
+  $esRutaKiosco ? 28800 : 3600
+);
 ini_set("session.use_strict_mode", 1);
 ini_set("session.use_only_cookies", 1);
 
@@ -50,7 +74,7 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
 
 $tiempoMaximoInactividad = 1800;
 
-if (!empty($_SESSION["_ultimo_acceso"])) {
+if (!$esRutaKiosco && !empty($_SESSION["_ultimo_acceso"])) {
   $inactividad = time() - (int)$_SESSION["_ultimo_acceso"];
 
   if ($inactividad > $tiempoMaximoInactividad) {
@@ -163,4 +187,15 @@ if (!defined("TURNO_COMPLETO_ID")) {
 
 if (!defined("TURNO_COMPLETO_NOMBRE")) {
   define("TURNO_COMPLETO_NOMBRE", "COMPLETO");
+}
+
+/**
+ * Kiosco Barcode to PC.
+ */
+if (!defined("BARCODE_RATE_LIMIT_POR_MINUTO")) {
+  define("BARCODE_RATE_LIMIT_POR_MINUTO", 120);
+}
+
+if (!defined("BARCODE_DUPLICADO_SEGUNDOS")) {
+  define("BARCODE_DUPLICADO_SEGUNDOS", 5);
 }

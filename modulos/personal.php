@@ -897,12 +897,12 @@ table th{
                                 id="inputCedula"
                                 required
                                 inputmode="numeric"
-                                minlength="8"
+                                minlength="7"
                                 maxlength="8"
-                                pattern="[0-9]{8}"
+                                pattern="[0-9]{7,8}"
                                 autocomplete="off"
-                                placeholder="Ej: 12345678"
-                                title="La cédula debe contener exactamente 8 números"
+                                placeholder="Ej: 1234567 o 12345678"
+                                title="La cédula debe contener 7 u 8 números"
                             >
                         </div>
 
@@ -1498,11 +1498,12 @@ $turnosConfig = $pdo->query("
                         id="editCedula"
                         required
                         inputmode="numeric"
-                        minlength="8"
+                        minlength="7"
                         maxlength="8"
-                        pattern="[0-9]{8}"
+                        pattern="[0-9]{7,8}"
                         autocomplete="off"
-                        title="La cédula debe contener exactamente 8 números"
+                        placeholder="Ej: 1234567 o 12345678"
+                        title="La cédula debe contener 7 u 8 números"
                     >
                 </div>
 
@@ -1668,9 +1669,9 @@ $turnosConfig = $pdo->query("
             .slice(0, 8);
 
         input.setCustomValidity(
-            /^[0-9]{8}$/.test(input.value)
+            /^[0-9]{7,8}$/.test(input.value)
                 ? ''
-                : 'La cédula debe contener exactamente 8 números.'
+                : 'La cédula debe contener 7 u 8 números.'
         );
     }
 

@@ -62,6 +62,11 @@ if ($nombres === "" || $apellidos === "" || $cedula === "" || $cargo_id <= 0 || 
   exit;
 }
 
+if (!preg_match('/^[0-9]{7,8}$/', $cedula)) {
+  header("Location: " . BASE_URL . "/modulos/personal.php?err=" . urlencode("La cédula debe contener 7 u 8 números."));
+  exit;
+}
+
 // Validar cargo existe
 $stmt = $pdo->prepare("SELECT id FROM cargos WHERE id=? LIMIT 1");
 $stmt->execute([$cargo_id]);

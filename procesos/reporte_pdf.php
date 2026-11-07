@@ -733,6 +733,26 @@ $pdf->SetFont("helvetica", "", 10);
 $generado = date("Y-m-d H:i");
 $turnoTxt = ($turnoId === null) ? "Todos" : ("Turno ID: " . $turnoId);
 
+$reporteUsuario = usuarioActual();
+$reporteAdmin = trim(
+  (string)($reporteUsuario["usuario"] ?? ($_SESSION["usuario"] ?? ""))
+);
+$reporteRol = strtoupper(
+  trim((string)($reporteUsuario["rol"] ?? ($_SESSION["rol"] ?? "")))
+);
+$reporteRoles = rolesUsuarioDisponibles();
+$reporteRolLabel = $reporteRoles[$reporteRol] ?? $reporteRol;
+
+if ($reporteAdmin === "") {
+  $reporteAdmin = "Usuario del sistema";
+}
+
+$reporteAdminTxt = $reporteAdmin;
+
+if ($reporteRolLabel !== "") {
+  $reporteAdminTxt .= " (" . $reporteRolLabel . ")";
+}
+
 // Título y nombre del archivo para reporte individual.
 $tituloReporte = "Reporte de Asistencia - " . $label;
 $filename = "reporte_{$desde}_{$hasta}.pdf";
@@ -759,6 +779,7 @@ $html = '
 <h1>'.$tituloReporte.'</h1>
 <div class="meta">
   Generado: '.$generado.'<br>
+  Generado por: <strong>'.pdfEsc($reporteAdminTxt).'</strong><br>
   Rango: <strong>'.$desde.'</strong> al <strong>'.$hasta.'</strong><br>
   Turno: '.$turnoTxt.'<br>
   Empleados: <strong>'.$sumGlobal["empleados"].'</strong> | Días en rango: <strong>'.$sumGlobal["dias"].'</strong><br>
