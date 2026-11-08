@@ -1652,15 +1652,15 @@ function configuracionVentanaTurno(string $tipoTurno): array {
         : "06:55:00",
       "entrada_hasta" => defined("PRIMER_TURNO_ENTRADA_HASTA")
         ? (string)constant("PRIMER_TURNO_ENTRADA_HASTA")
-        : "08:00:00",
+        : "09:00:00",
       "salida_desde" => defined("SEGUNDO_TURNO_SALIDA_DESDE")
         ? (string)constant("SEGUNDO_TURNO_SALIDA_DESDE")
-        : "17:00:00",
+        : "16:55:00",
       "salida_hasta" => defined("SEGUNDO_TURNO_SALIDA_HASTA")
         ? (string)constant("SEGUNDO_TURNO_SALIDA_HASTA")
         : "18:00:00",
-      "entrada_error" => "No es posible registrar la entrada. El horario permitido para el turno completo es de 6:55 AM a 8:00 AM.",
-      "salida_error" => "No es posible registrar la salida. El horario permitido es de 5:00 PM a 6:00 PM.",
+      "entrada_error" => "Entrada fuera del horario permitido del turno completo.",
+      "salida_error" => "Salida fuera del horario permitido del turno completo.",
     ];
   }
   if ($tipoTurno === "SEGUNDO") {
