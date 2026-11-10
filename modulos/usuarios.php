@@ -2,6 +2,8 @@
 require_once __DIR__ . "/../includes/conexion.php";
 require_once __DIR__ . "/../includes/funciones.php";
 
+noCache();
+
 requireLogin();
 if (!usuarioPuedeAccederModuloUsuarios()) {
   go(BASE_URL . "/modulos/asistencias.php?err=" . urlencode("No tienes permiso para administrar usuarios."));
@@ -24,12 +26,31 @@ $estadosDisponibles = estadosUsuarioDisponibles();
 $usuarioActualInfo = usuarioActual();
 
 $restablecimientoClave =
-  $_SESSION["restablecimiento_clave"]
-  ?? null;
+    $_SESSION["restablecimiento_clave"]
+    ?? null;
 
 unset(
-  $_SESSION["restablecimiento_clave"]
+    $_SESSION["restablecimiento_clave"]
 );
+
+$actorEntrega = usuarioActual();
+
+$actorSesionId = (int)(
+    $actorEntrega["id"]
+    ?? $_SESSION["usuario_id"]
+    ?? 0
+);
+
+if (
+    !is_array($restablecimientoClave) ||
+    (int)($restablecimientoClave["actor_id"] ?? 0) !== $actorSesionId ||
+    !is_numeric($restablecimientoClave["creada_en"] ?? null) ||
+    (int)$restablecimientoClave["creada_en"] > time() + 60 ||
+    time() - (int)$restablecimientoClave["creada_en"] > 300 ||
+    trim((string)($restablecimientoClave["clave_temporal"] ?? "")) === ""
+) {
+    $restablecimientoClave = null;
+}
 $usuarioActualId = (int)($usuarioActualInfo["id"] ?? ($_SESSION["usuario_id"] ?? 0));
 $puedeCrearUsuarios = puede("crear_usuarios");
 $puedeCambiarEstadoUsuarios = puede("cambiar_estado_usuarios");
