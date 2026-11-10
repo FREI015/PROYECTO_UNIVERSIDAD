@@ -5,6 +5,17 @@ require_once __DIR__ . "/includes/conexion.php";
 
 noCache();
 
+$sesionExpirada = (($_GET["expired"] ?? "") === "1");
+
+/*
+ * Si el frontend detecta la inactividad antes que el backend,
+ * se invalida aqui mismo la sesion y su identificador anterior.
+ */
+if ($sesionExpirada && isLogged()) {
+  $_SESSION = [];
+  session_regenerate_id(true);
+}
+
 if (isLogged()) {
   $next = safeNext($_GET["next"] ?? "", BASE_URL . "/modulos/asistencias.php");
   go($next);
@@ -203,6 +214,12 @@ body{
   font-weight:850;
 }
 
+.login-light-alert-info{
+  background:#EFF6FF;
+  border-color:#BFDBFE;
+  color:#1E40AF;
+}
+
 .login-light-form{
   display:flex;
   flex-direction:column;
@@ -355,6 +372,12 @@ require_once __DIR__ . "/includes/cintillo_institucional.php";
         <p class="login-light-lead">
           Ingresa tus credenciales para acceder al panel principal del sistema.
         </p>
+
+        <?php if ($sesionExpirada): ?>
+          <div class="login-light-alert login-light-alert-info">
+            Tu sesión expiró por inactividad. Inicia sesión nuevamente.
+          </div>
+        <?php endif; ?>
 
         <?php if ($err): ?>
           <div class="login-light-alert"><?php echo e($err); ?></div>

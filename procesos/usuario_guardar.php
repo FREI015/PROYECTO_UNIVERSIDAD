@@ -27,7 +27,8 @@ if (!preg_match('/^[A-Za-z0-9_.-]{3,50}$/', $usuario)) {
 
 $errorPolitica =
   errorPoliticaClaveUsuario(
-    $clave
+    $clave,
+    true
   );
 
 if ($errorPolitica !== "") {

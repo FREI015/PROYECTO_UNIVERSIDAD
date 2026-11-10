@@ -487,7 +487,7 @@ function generarClaveTemporalUsuario(int $longitud = 16): string {
   );
 }
 
-function errorPoliticaClaveUsuario(string $clave): string {
+function errorPoliticaClaveUsuario(string $clave, bool $exigirSimbolo = false): string {
   if (strlen($clave) < 10) {
 
     return
@@ -525,6 +525,18 @@ function errorPoliticaClaveUsuario(string $clave): string {
 
     return
       "La nueva clave debe incluir al menos un numero.";
+  }
+
+  if (
+    $exigirSimbolo &&
+    !preg_match(
+      '/[^A-Za-z0-9\s]/',
+      $clave
+    )
+  ) {
+
+    return
+      "La nueva clave debe incluir al menos un caracter especial.";
   }
 
   return "";

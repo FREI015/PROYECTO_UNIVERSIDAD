@@ -1,4 +1,8 @@
 (function () {
+  if (window.AppFeedback) return;
+
+  var ultimosMensajes = {};
+
   function ready(fn) {
     if (document.readyState !== "loading") {
       fn();
@@ -36,7 +40,18 @@
   }
 
   function showToast(type, message) {
+    message = String(message || "").trim();
+
     if (!message) return;
+
+    var clave = type + "|" + message;
+    var ahora = Date.now();
+
+    if (ultimosMensajes[clave] && ahora - ultimosMensajes[clave] < 1500) {
+      return;
+    }
+
+    ultimosMensajes[clave] = ahora;
 
     injectStyles();
 
@@ -86,8 +101,15 @@
     var ok = document.querySelector(".alert.ok");
     var bad = document.querySelector(".alert.bad");
 
-    if (ok) showToast("ok", ok.textContent.trim());
-    if (bad) showToast("bad", bad.textContent.trim());
+    if (ok) {
+      showToast("ok", ok.textContent.trim());
+      ok.style.display = "none";
+    }
+
+    if (bad) {
+      showToast("bad", bad.textContent.trim());
+      bad.style.display = "none";
+    }
   }
 
   function protectForms() {
@@ -121,6 +143,10 @@
       });
     });
   }
+
+  window.AppFeedback = {
+    show: showToast
+  };
 
   ready(function () {
     readMessages();

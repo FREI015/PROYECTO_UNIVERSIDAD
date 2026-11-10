@@ -72,7 +72,11 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
   session_start();
 }
 
-$tiempoMaximoInactividad = 1800;
+if (!defined("SESSION_IDLE_TIMEOUT_SECONDS")) {
+  define("SESSION_IDLE_TIMEOUT_SECONDS", 300);
+}
+
+$tiempoMaximoInactividad = SESSION_IDLE_TIMEOUT_SECONDS;
 
 if (!$esRutaKiosco && !empty($_SESSION["_ultimo_acceso"])) {
   $inactividad = time() - (int)$_SESSION["_ultimo_acceso"];
@@ -82,16 +86,41 @@ if (!$esRutaKiosco && !empty($_SESSION["_ultimo_acceso"])) {
     session_unset();
     session_destroy();
 
-    $redirect = isset($_SERVER["REQUEST_URI"]) && $_SERVER["REQUEST_URI"] !== ""
-      ? "?next=" . urlencode($_SERVER["REQUEST_URI"])
-      : "";
+    $requestUri = (string)($_SERVER["REQUEST_URI"] ?? "");
+    $requestPath = (string)(parse_url($requestUri, PHP_URL_PATH) ?? "");
+    $redirect = "";
 
-    header("Location: " . BASE_URL . "/login.php" . $redirect);
+    if ($requestPath !== "" && substr($requestPath, -strlen("/login.php")) !== "/login.php") {
+      $redirect = "&next=" . urlencode($requestUri);
+    }
+
+    header("Location: " . BASE_URL . "/login.php?expired=1" . $redirect);
     exit;
   }
 }
 
-$_SESSION["_ultimo_acceso"] = time();
+/*
+ * Solo las acciones reales del usuario renuevan la sesion.
+ * Las peticiones automaticas en segundo plano no deben reiniciar
+ * el contador de inactividad.
+ */
+$esActividadExplicita =
+  (string)($_SERVER["HTTP_X_APP_ACTIVITY"] ?? "") === "1";
+
+$esPeticionSegundoPlano =
+  !$esActividadExplicita &&
+  (
+    !empty($_SERVER["HTTP_X_REQUESTED_WITH"]) ||
+    stripos((string)($_SERVER["HTTP_ACCEPT"] ?? ""), "application/json") !== false
+  );
+
+/*
+ * El latido del frontend extiende la sesion unicamente dentro de
+ * procesos/sesion_actividad.php, despues de validar el CSRF.
+ */
+if (!$esRutaKiosco && !$esPeticionSegundoPlano && !$esActividadExplicita) {
+  $_SESSION["_ultimo_acceso"] = time();
+}
 
 if (!defined("RETARDO_TOLERANCIA_MINUTOS")) {
   define("RETARDO_TOLERANCIA_MINUTOS", 5);

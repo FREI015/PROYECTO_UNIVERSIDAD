@@ -199,6 +199,54 @@ require_once __DIR__ . "/../includes/header.php";
     align-items:end;
   }
 
+  .password-requirements{
+    margin:12px 0 0;
+    padding:12px 14px;
+    border:1px solid #e0e7ef;
+    border-radius:12px;
+    background:#f8fafc;
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:6px 16px;
+  }
+
+  .password-requirements-title{
+    grid-column:1 / -1;
+    margin:0 0 2px;
+    color:#334155;
+    font-size:12px;
+    font-weight:900;
+  }
+
+  .password-requirement{
+    display:flex;
+    align-items:center;
+    gap:7px;
+    color:#64748b;
+    font-size:12px;
+    font-weight:750;
+    line-height:1.4;
+    transition:color .15s ease;
+  }
+
+  .password-requirement::before{
+    content:"";
+    width:8px;
+    height:8px;
+    border-radius:50%;
+    background:#cbd5e1;
+    flex:0 0 auto;
+    transition:background .15s ease;
+  }
+
+  .password-requirement.is-ok{
+    color:#166534;
+  }
+
+  .password-requirement.is-ok::before{
+    background:#22c55e;
+  }
+
   .filters{
     background:#fff;
     border:1px solid #e9edf4;
@@ -374,6 +422,7 @@ require_once __DIR__ . "/../includes/header.php";
     .metrics-grid{grid-template-columns:1fr}
     .create-user-grid{grid-template-columns:1fr}
     .filters{grid-template-columns:1fr}
+    .password-requirements{grid-template-columns:1fr}
   }
 </style>
 
@@ -473,12 +522,31 @@ require_once __DIR__ . "/../includes/header.php";
 
           <div class="field">
             <label>Clave</label>
-            <input class="input" type="password" name="clave" required minlength="10" autocomplete="new-password" placeholder="Minimo 10 caracteres, mayuscula, minuscula y numero">
+            <input
+              class="input"
+              type="password"
+              name="clave"
+              required
+              minlength="10"
+              pattern="(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9\s]).{10,}"
+              autocomplete="new-password"
+              placeholder="Minimo 10 caracteres con mayuscula, minuscula, numero y caracter especial"
+              title="Minimo 10 caracteres, con mayuscula, minuscula, numero y caracter especial"
+            >
           </div>
 
           <div class="field">
             <label>Confirmar clave</label>
-            <input class="input" type="password" name="clave_confirmar" required minlength="10" autocomplete="new-password">
+            <input
+              class="input"
+              type="password"
+              name="clave_confirmar"
+              required
+              minlength="10"
+              pattern="(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9\s]).{10,}"
+              autocomplete="new-password"
+              title="La confirmacion debe cumplir los mismos requisitos de la clave"
+            >
           </div>
 
           <div class="field">
@@ -504,6 +572,16 @@ require_once __DIR__ . "/../includes/header.php";
           </div>
 
           <button class="btn-primary" type="submit">Crear</button>
+        </div>
+
+        <div class="password-requirements" id="crearUsuarioPassRequisitos" aria-live="polite">
+          <div class="password-requirements-title">La clave debe cumplir:</div>
+          <div class="password-requirement" data-req="longitud">Mínimo 10 caracteres</div>
+          <div class="password-requirement" data-req="mayuscula">Al menos una letra mayúscula</div>
+          <div class="password-requirement" data-req="minuscula">Al menos una letra minúscula</div>
+          <div class="password-requirement" data-req="numero">Al menos un número</div>
+          <div class="password-requirement" data-req="especial">Al menos un carácter especial</div>
+          <div class="password-requirement" data-req="coincide">Las dos claves coinciden</div>
         </div>
       </form>
     </div>
@@ -868,6 +946,48 @@ require_once __DIR__ . "/../includes/header.php";
   </details>
 </div>
 <?php endif; ?>
+<script>
+(function () {
+  var form = document.getElementById("formCrearUsuario");
+  var pass = form ? form.querySelector('input[name="clave"]') : null;
+  var confirmar = form ? form.querySelector('input[name="clave_confirmar"]') : null;
+  var lista = document.getElementById("crearUsuarioPassRequisitos");
+
+  if (!form || !pass || !lista) return;
+
+  var items = {};
+
+  Array.prototype.slice.call(lista.querySelectorAll("[data-req]")).forEach(function (item) {
+    items[item.getAttribute("data-req")] = item;
+  });
+
+  function marcar(clave, cumple) {
+    if (items[clave]) {
+      items[clave].classList.toggle("is-ok", !!cumple);
+    }
+  }
+
+  function actualizar() {
+    var valor = pass.value || "";
+    var confirmacion = confirmar ? (confirmar.value || "") : valor;
+
+    marcar("longitud", valor.length >= 10);
+    marcar("mayuscula", /[A-Z]/.test(valor));
+    marcar("minuscula", /[a-z]/.test(valor));
+    marcar("numero", /[0-9]/.test(valor));
+    marcar("especial", /[^A-Za-z0-9\s]/.test(valor));
+    marcar("coincide", valor !== "" && confirmacion === valor);
+  }
+
+  pass.addEventListener("input", actualizar);
+
+  if (confirmar) {
+    confirmar.addEventListener("input", actualizar);
+  }
+
+  actualizar();
+})();
+</script>
 <?php require_once __DIR__ . "/../includes/footer.php"; ?>
 
 

@@ -204,6 +204,18 @@ $logoutUrl = BASE_URL . "/procesos/logout.php";
     }
   </style>
   <link rel="stylesheet" href="<?php echo e(BASE_URL); ?>/assets/css/app-theme.css?v=<?php echo e((string)(@filemtime(__DIR__ . "/../assets/css/app-theme.css") ?: 2)); ?>">
+
+  <script>
+    window.APP_SESSION = <?php echo json_encode(
+      [
+        "timeoutMs" => ((int)SESSION_IDLE_TIMEOUT_SECONDS) * 1000,
+        "heartbeatUrl" => BASE_URL . "/procesos/sesion_actividad.php",
+        "loginUrl" => BASE_URL . "/login.php?expired=1",
+        "csrf" => csrfToken()
+      ],
+      JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_APOS | JSON_UNESCAPED_SLASHES
+    ); ?>;
+  </script>
 </head>
 <body>
 

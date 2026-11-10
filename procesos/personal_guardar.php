@@ -17,7 +17,7 @@ $apellidos = trim($_POST["apellidos"] ?? "");
 $cedula    = trim($_POST["cedula"] ?? "");
 $cargo_id  = (int)($_POST["cargo_id"] ?? 0);
 $turno_id  = (int)($_POST["turno_id"] ?? 0);
-$codigoBarra = strtoupper(trim($_POST["codigo_barra"] ?? ""));
+$codigoBarra = trim($_POST["codigo_barra"] ?? "");
 if ($turno_id > 0) {
   $stmtTurnoScope = $pdo->prepare("SELECT nombre FROM turnos WHERE id = ? LIMIT 1");
   $stmtTurnoScope->execute([$turno_id]);
@@ -69,13 +69,8 @@ if ($codigoBarra === "") {
   exit;
 }
 
-if (strlen($codigoBarra) > 50) {
-  header("Location: " . BASE_URL . "/modulos/personal.php?err=" . urlencode("El código de barras no debe superar 50 caracteres"));
-  exit;
-}
-
-if (preg_match('/[\s"\']/', $codigoBarra)) {
-  header("Location: " . BASE_URL . "/modulos/personal.php?err=" . urlencode("El código de barras no debe contener espacios ni comillas"));
+if (!preg_match('/^[0-9]{7,8}$/', $codigoBarra)) {
+  header("Location: " . BASE_URL . "/modulos/personal.php?err=" . urlencode("El código de barras debe contener 7 u 8 números"));
   exit;
 }
 

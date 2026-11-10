@@ -971,17 +971,17 @@ table th{
                                 name="codigo_barra"
                                 id="inputCodigoBarra"
                                 required
-                                minlength="3"
-                                maxlength="50"
-                                pattern="[A-Za-z0-9][A-Za-z0-9_-]{2,49}"
-                                inputmode="text"
+                                inputmode="numeric"
+                                minlength="7"
+                                maxlength="8"
+                                pattern="[0-9]{7,8}"
                                 autocomplete="off"
-                                placeholder="Ej: ASIS-12345678"
-                                title="El código debe tener entre 3 y 50 caracteres, sin espacios ni símbolos especiales"
+                                placeholder="Ej: 12345678"
+                                title="El código de barras debe contener 7 u 8 números"
                             >
 
                             <small style="display:block;color:#6b7280;margin-top:6px">
-                                Código del carné. Hasta 50 caracteres, sin espacios.
+                                Solo números. Debe contener 7 u 8 dígitos.
                             </small>
                         </div>
 
@@ -1554,16 +1554,16 @@ $turnosConfig = $pdo->query("
                         name="codigo_barra"
                         id="editCodigoBarra"
                         required
-                        minlength="3"
-                        maxlength="50"
-                        pattern="[A-Za-z0-9][A-Za-z0-9_-]{2,49}"
-                        inputmode="text"
+                        inputmode="numeric"
+                        minlength="7"
+                        maxlength="8"
+                        pattern="[0-9]{7,8}"
                         autocomplete="off"
-                        title="El código debe tener entre 3 y 50 caracteres, sin espacios"
+                        title="El código de barras debe contener 7 u 8 números"
                     >
 
                     <small style="display:block;color:#6b7280;margin-top:6px">
-                        Hasta 50 caracteres, sin espacios.
+                        Solo números. Debe contener 7 u 8 dígitos.
                     </small>
                 </div>
 
@@ -1623,7 +1623,7 @@ $turnosConfig = $pdo->query("
     const regexNombres =
         /^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+(?: [A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+)*$/;
 
-    const regexCodigo = /^[A-Z0-9][A-Z0-9_-]{2,49}$/;
+    const regexCodigo = /^[0-9]{7,8}$/;
 
     const baseUrl = <?php echo json_encode(
         rtrim(BASE_URL, '/'),
@@ -1682,14 +1682,13 @@ $turnosConfig = $pdo->query("
         }
 
         input.value = input.value
-            .toUpperCase()
-            .replace(/[^A-Z0-9_-]/g, '')
-            .slice(0, 50);
+            .replace(/[^0-9]/g, '')
+            .slice(0, 8);
 
         input.setCustomValidity(
             regexCodigo.test(input.value)
                 ? ''
-                : 'El código debe tener entre 3 y 50 caracteres, sin espacios.'
+                : 'El código de barras debe contener 7 u 8 números.'
         );
     }
 

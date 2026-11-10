@@ -373,6 +373,25 @@ foreach ($rows as $row) {
     align-items:end;
     margin:12px 0 14px;
   }
+
+  .filters-role-note{
+    grid-column:1 / -1;
+    display:flex;
+    align-items:center;
+    gap:9px;
+    padding:10px 13px;
+    border:1px solid #dbeaf8;
+    border-radius:12px;
+    background:var(--primary-soft, #F4E6EA);
+    color:var(--primary-strong, #600018);
+    font-size:12px;
+    font-weight:800;
+    line-height:1.45;
+  }
+
+  .filters-role-note strong{
+    font-weight:950;
+  }
   
         .success-person-card{
       display:flex;
@@ -869,6 +888,12 @@ tbody td:last-child{
   <?php if ($err): ?><div class="alert bad"><?php echo e($err); ?></div><?php endif; ?>
 
   <form class="filters-grid" method="GET">
+    <?php if (!$tieneAlcanceGlobal && count($turnos) === 1): ?>
+      <div class="filters-role-note" role="status">
+        <span><strong>Turno fijado por tu rol:</strong> <?php echo e($turnos[0]["nombre"]); ?>. Tu rol solo puede consultar este turno.</span>
+      </div>
+    <?php endif; ?>
+
     <input class="input" name="q" value="<?php echo e($q); ?>" placeholder="Buscar por nombre, cargo o cédula...">
 
     <select class="select" name="estado">
@@ -902,9 +927,6 @@ tbody td:last-child{
         >
           <option selected><?php echo e($turnos[0]["nombre"]); ?></option>
         </select>
-        <small style="display:block;margin-top:5px;color:#64748b;font-size:11px;font-weight:800;">
-          Turno fijado por tu rol
-        </small>
       </div>
     <?php else: ?>
       <select class="select" disabled aria-label="Sin turno disponible">
@@ -1738,7 +1760,6 @@ if ($inicialFoto === "") {
   }
 })();
 </script>
-<script src="<?php echo e(BASE_URL); ?>/assets/js/app-feedback.js"></script>
 <?php require_once __DIR__ . "/../includes/footer.php"; ?>
 
 
